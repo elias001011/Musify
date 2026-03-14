@@ -22,6 +22,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:hive/hive.dart';
@@ -38,7 +40,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   MusifyAudioHandler() {
     _androidEqualizer = AndroidEqualizer();
     audioPlayer = AudioPlayer(
-      audioPipeline: Platform.isAndroid
+      audioPipeline: !kIsWeb && Platform.isAndroid
           ? AudioPipeline(androidAudioEffects: [_androidEqualizer])
           : AudioPipeline(),
       audioLoadConfiguration: const AudioLoadConfiguration(
@@ -318,7 +320,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<bool> _ensureEqualizerConfigured({bool force = false}) async {
-    if (!Platform.isAndroid) return false;
+    if (kIsWeb || !Platform.isAndroid) return false;
     if (_equalizerInitialized) return true;
 
     final now = DateTime.now();
@@ -377,10 +379,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
     }
   }
 
-  bool get isEqualizerSupported => Platform.isAndroid;
+  bool get isEqualizerSupported => !kIsWeb && Platform.isAndroid;
 
   Future<AndroidEqualizerParameters?> getEqualizerParameters() async {
-    if (!Platform.isAndroid) return null;
+    if (kIsWeb || !Platform.isAndroid) return null;
     final initialized = await _ensureEqualizerConfigured();
     if (!initialized) return null;
     try {
@@ -398,7 +400,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> setEqualizerEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
     try {
@@ -415,7 +417,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> setEqualizerBandGain(int index, double gain) async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
 
@@ -441,7 +443,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> resetEqualizerBands() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
 

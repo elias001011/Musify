@@ -24,6 +24,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:musify/main.dart';
@@ -34,15 +36,16 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 class _ProxyResources {
   _ProxyResources(this.httpClient, this.ioClient);
 
-  final HttpClient httpClient;
-  final IOClient ioClient;
+  final HttpClient? httpClient;
+  final IOClient? ioClient;
 
   void close() {
+    if (kIsWeb) return;
     try {
-      ioClient.close();
+      ioClient?.close();
     } catch (_) {}
     try {
-      httpClient.close(force: true);
+      httpClient?.close(force: true);
     } catch (_) {}
   }
 }
@@ -108,7 +111,7 @@ class ProxyManager {
   String? _sharedProxyAddress;
 
   Future<void> _fetchProxies() async {
-    if (!useProxy.value) return;
+    if (kIsWeb || !useProxy.value) return;
     try {
       // Clear existing candidates to avoid duplicates and stale proxies
       _proxiesByCountry.clear();
@@ -298,6 +301,8 @@ class ProxyManager {
     final key = proxy.address;
     var res = _proxyResources[key];
     if (res != null) return res;
+
+    if (kIsWeb) return res!; // Should not happen with guards but for safety
 
     final httpClient = HttpClient()
       ..connectionTimeout = Duration(seconds: timeoutSeconds)

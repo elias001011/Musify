@@ -22,6 +22,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -214,6 +215,9 @@ Future<Box> _openBox(String category) async {
 }
 
 Future<String> backupData(BuildContext context) async {
+  if (kIsWeb) {
+    return 'Backup not supported on web yet.';
+  }
   final boxNames = ['user', 'settings'];
   final dlPath = await FilePicker.platform.getDirectoryPath();
 
@@ -282,6 +286,9 @@ Future<String> backupData(BuildContext context) async {
 }
 
 Future<String> restoreData(BuildContext context) async {
+  if (kIsWeb) {
+    return 'Restore not supported on web yet.';
+  }
   final boxNames = ['user', 'settings'];
   final result = await FilePicker.platform.pickFiles(allowMultiple: true);
 

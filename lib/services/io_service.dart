@@ -20,6 +20,7 @@
  */
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 late String applicationDirPath;
 
@@ -34,15 +35,19 @@ class FilePaths {
 
   // Get full paths for various file types
   static String getAudioPath(String songId) {
+    if (kIsWeb) return '';
     return '$applicationDirPath/$tracksDir/$songId$audioExtension';
   }
 
   static String getArtworkPath(String songId) {
+    if (kIsWeb) return '';
     return '$applicationDirPath/$artworksDir/$songId$artworkExtension';
   }
 
   // Ensure directories exist
   static Future<void> ensureDirectoriesExist() async {
+    if (kIsWeb) return;
+    
     final tracksDirectory = Directory('$applicationDirPath/$tracksDir');
     final artworksDirectory = Directory('$applicationDirPath/$artworksDir');
 
@@ -55,3 +60,4 @@ class FilePaths {
     }
   }
 }
+

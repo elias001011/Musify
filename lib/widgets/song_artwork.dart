@@ -20,6 +20,7 @@
  */
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -42,7 +43,7 @@ class SongArtworkWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return metadata.artUri?.scheme == 'file'
+    return !kIsWeb && metadata.artUri?.scheme == 'file'
         ? SizedBox(
             width: size,
             height: size,
@@ -50,7 +51,11 @@ class SongArtworkWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
                 File(metadata.extras?['artWorkPath']),
+                width: size,
+                height: size,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    NullArtworkWidget(iconSize: errorWidgetIconSize),
               ),
             ),
           )

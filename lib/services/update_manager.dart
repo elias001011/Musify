@@ -44,6 +44,7 @@ const String downloadUrlArm64Key = 'arm64url';
 const String downloadFilename = 'Musify.apk';
 
 Future<void> checkAppUpdates() async {
+  if (kIsWeb) return;
   try {
     final response = await http.get(Uri.parse(checkUrl));
 
@@ -262,6 +263,7 @@ bool isLatestVersionHigher(String appVersion, String latestVersion) {
 }
 
 Future<String> getCPUArchitecture() async {
+  if (kIsWeb) return 'web';
   final info = await Process.run('uname', ['-m']);
   final cpu = info.stdout.toString().replaceAll('\n', '');
 

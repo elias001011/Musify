@@ -23,6 +23,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
@@ -512,6 +513,7 @@ Future<String?> getSongLyrics(String? artist, String title) async {
 }
 
 Future<bool> makeSongOffline(dynamic song) async {
+  if (kIsWeb) return false;
   try {
     final String? ytid = song['ytid'];
 
@@ -617,6 +619,7 @@ Future<bool> makeSongOffline(dynamic song) async {
 }
 
 Future<bool> removeSongFromOffline(dynamic songId) async {
+  if (kIsWeb) return false;
   try {
     final audioPath = FilePaths.getAudioPath(songId);
     final audioFile = File(audioPath);
@@ -665,6 +668,7 @@ Future<bool> removeSongFromOffline(dynamic songId) async {
 }
 
 Future<File?> _downloadAndSaveArtworkFile(String url, String filePath) async {
+  if (kIsWeb) return null;
   try {
     final response = await http.get(Uri.parse(url));
 

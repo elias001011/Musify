@@ -25,6 +25,8 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -71,6 +73,10 @@ class OfflinePlaylistService {
   }
 
   Future<void> downloadPlaylist(BuildContext context, Map playlist) async {
+    if (kIsWeb) {
+      showToast(context, 'Downloads not supported on web.');
+      return;
+    }
     final playlistId = playlist['ytid'] as String? ?? playlist['title'];
 
     if (playlistId == null || playlistId.isEmpty) {
@@ -325,6 +331,7 @@ class OfflinePlaylistService {
   }
 
   Future<void> removeOfflinePlaylist(String playlistId) async {
+    if (kIsWeb) return;
     try {
       final normalizedPlaylistId = playlistId.trim();
       if (normalizedPlaylistId.isEmpty) {
@@ -414,6 +421,7 @@ class OfflinePlaylistService {
   }
 
   Future<void> deleteAllDownloads() async {
+    if (kIsWeb) return;
     // Cancel all active downloads first and wait for them to stop
     final activeIds = List<String>.from(activeDownloads);
     for (final id in activeIds) {

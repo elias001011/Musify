@@ -639,14 +639,18 @@ class _OfflineArtwork extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         child: Stack(
           children: [
-            Image.file(
-              File(artworkPath),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  const NullArtworkWidget(iconSize: 30),
-            ),
+            if (!kIsWeb)
+              Image.file(
+                File(artworkPath),
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const NullArtworkWidget(iconSize: 30),
+              )
+            else
+              const NullArtworkWidget(iconSize: 30),
+
             Positioned(
               top: 3,
               right: 3,

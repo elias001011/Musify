@@ -248,10 +248,30 @@ class _MusifyState extends State<Musify> {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initialisation();
-
-  runApp(const Musify());
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    try {
+      debugPrint('Starting Musify initialization...');
+      await initialisation();
+      debugPrint('Initialization complete.');
+      runApp(const Musify());
+    } catch (e, stackTrace) {
+      debugPrint('FATAL INITIALIZATION ERROR: $e\n$stackTrace');
+      if (kIsWeb) {
+        runApp(MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SelectableText('Fatal Error: $e\n\n$stackTrace'),
+            ),
+          ),
+        ));
+      } else {
+        rethrow;
+      }
+    }
+  }, (error, stackTrace) {
+    debugPrint('UNCAUGHT ERROR: $error\n$stackTrace');
+  });
 }
 
 Future<void> initialisation() async {

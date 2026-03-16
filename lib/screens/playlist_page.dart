@@ -172,20 +172,43 @@ class _PlaylistPageState extends State<PlaylistPage> {
                     valueListenable: _searchQueryNotifier,
                     builder: (context, searchQuery, _) {
                       final sourceList = _getSourceList(searchQuery);
+                      final isUserCreated =
+                          _playlist['source'] == 'user-created';
+                      final canReorder =
+                          isUserCreated &&
+                          searchQuery.isEmpty &&
+                          _sortType == PlaylistSortType.default_;
+                      final sliverList = canReorder
+                          ? SliverReorderableList(
+                              itemCount: sourceList.length,
+                              itemBuilder: (context, index) {
+                                final song = sourceList[index];
+                                return ReorderableDelayedDragStartListener(
+                                  key: ValueKey(song['ytid']),
+                                  index: index,
+                                  child: _buildSongListItem(
+                                    song,
+                                    index,
+                                    true,
+                                  ),
+                                );
+                              },
+                              onReorder: _reorderPlaylistSongs,
+                            )
+                          : SliverList.builder(
+                              itemCount: sourceList.length,
+                              itemBuilder: (context, index) {
+                                final isRemovable = isUserCreated;
+                                return _buildSongListItem(
+                                  sourceList[index],
+                                  index,
+                                  isRemovable,
+                                );
+                              },
+                            );
                       return SliverPadding(
                         padding: commonListViewBottomPadding,
-                        sliver: SliverList.builder(
-                          itemCount: sourceList.length,
-                          itemBuilder: (context, index) {
-                            final isRemovable =
-                                _playlist['source'] == 'user-created';
-                            return _buildSongListItem(
-                              sourceList[index],
-                              index,
-                              isRemovable,
-                            );
-                          },
-                        ),
+                        sliver: sliverList,
                       );
                     },
                   ),
@@ -636,6 +659,32 @@ class _PlaylistPageState extends State<PlaylistPage> {
       logger.log(
         '(_updateSongsListOnRemove): Widget not mounted, cannot show undo toast.',
       );
+    }
+  }
+
+  void _reorderPlaylistSongs(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+
+    if (oldIndex == newIndex) return;
+
+    setState(() {
+      final movedSong = _originalPlaylistList.removeAt(oldIndex);
+      _originalPlaylistList.insert(newIndex, movedSong);
+      _playlist['list'] = List<dynamic>.from(_originalPlaylistList);
+    });
+
+    final playlistId = _playlist['ytid']?.toString();
+    if (playlistId == null || playlistId.isEmpty) return;
+
+    final success = reorderSongInCustomPlaylist(
+      playlistId,
+      oldIndex,
+      newIndex,
+    );
+    if (!success && mounted) {
+      showToast(context, context.l10n!.error);
     }
   }
 

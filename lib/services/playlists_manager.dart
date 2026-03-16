@@ -366,6 +366,97 @@ bool removeSongFromPlaylist(
   }
 }
 
+bool reorderSongInCustomPlaylist(
+  String playlistId,
+  int oldIndex,
+  int newIndex,
+) {
+  try {
+    if (oldIndex == newIndex) return true;
+
+    Map? targetPlaylist;
+    var isFromFolder = false;
+
+    for (final playlist in userCustomPlaylists.value) {
+      if (playlist['ytid']?.toString() == playlistId) {
+        targetPlaylist = playlist as Map;
+        break;
+      }
+    }
+
+    if (targetPlaylist == null) {
+      for (final folder in userPlaylistFolders.value) {
+        final folderPlaylists = folder['playlists'] as List<dynamic>? ?? [];
+        final playlistIndex = folderPlaylists.indexWhere(
+          (p) => p['ytid']?.toString() == playlistId,
+        );
+        if (playlistIndex != -1) {
+          targetPlaylist = folderPlaylists[playlistIndex] as Map;
+          isFromFolder = true;
+          break;
+        }
+      }
+    }
+
+    if (targetPlaylist == null || targetPlaylist['list'] == null) {
+      return false;
+    }
+
+    final songs = List<dynamic>.from(targetPlaylist['list'] as List);
+    if (oldIndex < 0 ||
+        oldIndex >= songs.length ||
+        newIndex < 0 ||
+        newIndex >= songs.length) {
+      return false;
+    }
+
+    final song = songs.removeAt(oldIndex);
+    songs.insert(newIndex, song);
+
+    final updatedPlaylist = Map<String, dynamic>.from(targetPlaylist)
+      ..['list'] = songs;
+
+    if (isFromFolder) {
+      final updatedFolders = List<Map>.from(userPlaylistFolders.value);
+      for (final folder in updatedFolders) {
+        final folderPlaylists = List<Map>.from(folder['playlists'] ?? []);
+        final playlistIndex = folderPlaylists.indexWhere(
+          (p) => p['ytid']?.toString() == playlistId,
+        );
+        if (playlistIndex != -1) {
+          folderPlaylists[playlistIndex] = updatedPlaylist;
+          folder['playlists'] = folderPlaylists;
+          break;
+        }
+      }
+      userPlaylistFolders.value = updatedFolders;
+      unawaited(
+        addOrUpdateData('user', 'playlistFolders', userPlaylistFolders.value),
+      );
+    } else {
+      final updatedPlaylists = userCustomPlaylists.value
+          .map(
+            (p) =>
+                p['ytid']?.toString() == playlistId ? updatedPlaylist : p,
+          )
+          .toList();
+      userCustomPlaylists.value = updatedPlaylists;
+      unawaited(
+        addOrUpdateData('user', 'customPlaylists', userCustomPlaylists.value),
+      );
+    }
+
+    return true;
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error reordering playlist songs',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
 void removeUserPlaylist(String playlistId) {
   final normalizedId = playlistId.trim();
   if (normalizedId.isEmpty) return;

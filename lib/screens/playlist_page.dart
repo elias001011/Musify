@@ -190,6 +190,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                     song,
                                     index,
                                     true,
+                                    sourceList,
+                                    false,
                                   ),
                                 );
                               },
@@ -203,6 +205,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                   sourceList[index],
                                   index,
                                   isRemovable,
+                                  sourceList,
+                                  searchQuery.isNotEmpty,
                                 );
                               },
                             );
@@ -720,13 +724,17 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
-  Widget _buildSongListItem(dynamic song, int index, bool isRemovable) {
-    final sourceList = _getSourceList(_searchQueryNotifier.value);
+  Widget _buildSongListItem(
+    dynamic song,
+    int index,
+    bool isRemovable,
+    List<dynamic> sourceList,
+    bool isSearching,
+  ) {
     final totalItems = sourceList.length;
     final borderRadius = getItemBorderRadius(index, totalItems);
     final isUserCreatedPlaylist = _playlist?['source'] == 'user-created';
     final playlistId = isUserCreatedPlaylist ? _playlist!['ytid'] : null;
-    final isSearching = _searchQueryNotifier.value.isNotEmpty;
     final playlistForQueue = isSearching
         ? {..._playlist as Map, 'list': sourceList}
         : _playlist;

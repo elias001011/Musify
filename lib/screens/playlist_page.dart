@@ -172,15 +172,22 @@ class _PlaylistPageState extends State<PlaylistPage> {
                     valueListenable: _searchQueryNotifier,
                     builder: (context, searchQuery, _) {
                       final sourceList = _getSourceList(searchQuery);
+                      final isSearching = searchQuery.isNotEmpty;
                       final isUserCreated =
                           _playlist['source'] == 'user-created';
+                      final playlistId =
+                          isUserCreated ? _playlist['ytid'] : null;
+                      final playlistForQueue = isSearching
+                          ? {..._playlist as Map, 'list': sourceList}
+                          : _playlist;
+                      final totalItems = sourceList.length;
                       final canReorder =
                           isUserCreated &&
-                          searchQuery.isEmpty &&
+                          !isSearching &&
                           _sortType == PlaylistSortType.default_;
                       final sliverList = canReorder
                           ? SliverReorderableList(
-                              itemCount: sourceList.length,
+                              itemCount: totalItems,
                               itemBuilder: (context, index) {
                                 final song = sourceList[index];
                                 return ReorderableDelayedDragStartListener(
@@ -190,7 +197,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                     song,
                                     index,
                                     true,
-                                    sourceList,
+                                    totalItems,
+                                    playlistForQueue,
+                                    playlistId,
+                                    isUserCreated,
                                     false,
                                   ),
                                 );
@@ -198,15 +208,18 @@ class _PlaylistPageState extends State<PlaylistPage> {
                               onReorder: _reorderPlaylistSongs,
                             )
                           : SliverList.builder(
-                              itemCount: sourceList.length,
+                              itemCount: totalItems,
                               itemBuilder: (context, index) {
                                 final isRemovable = isUserCreated;
                                 return _buildSongListItem(
                                   sourceList[index],
                                   index,
                                   isRemovable,
-                                  sourceList,
-                                  searchQuery.isNotEmpty,
+                                  totalItems,
+                                  playlistForQueue,
+                                  playlistId,
+                                  isUserCreated,
+                                  isSearching,
                                 );
                               },
                             );
@@ -728,41 +741,40 @@ class _PlaylistPageState extends State<PlaylistPage> {
     dynamic song,
     int index,
     bool isRemovable,
-    List<dynamic> sourceList,
+    int totalItems,
+    dynamic playlistForQueue,
+    String? playlistId,
+    bool isUserCreatedPlaylist,
     bool isSearching,
   ) {
-    final totalItems = sourceList.length;
     final borderRadius = getItemBorderRadius(index, totalItems);
-    final isUserCreatedPlaylist = _playlist?['source'] == 'user-created';
-    final playlistId = isUserCreatedPlaylist ? _playlist!['ytid'] : null;
-    final playlistForQueue = isSearching
-        ? {..._playlist as Map, 'list': sourceList}
-        : _playlist;
 
-    return SongBar(
-      song,
-      true,
+    return RepaintBoundary(
       key: ValueKey(song['ytid']),
-      onRemove: (isRemovable && !isSearching)
-          ? () {
-              if (removeSongFromPlaylist(
-                _playlist,
-                song,
-                removeOneAtIndex: index,
-              )) {
-                _updateSongsListOnRemove(index, song);
+      child: SongBar(
+        song,
+        true,
+        onRemove: (isRemovable && !isSearching)
+            ? () {
+                if (removeSongFromPlaylist(
+                  _playlist,
+                  song,
+                  removeOneAtIndex: index,
+                )) {
+                  _updateSongsListOnRemove(index, song);
+                }
               }
-            }
-          : null,
-      onPlay: () {
-        audioHandler.playPlaylistSong(
-          playlist: playlistForQueue,
-          songIndex: index,
-        );
-      },
-      borderRadius: borderRadius,
-      playlistId: playlistId,
-      onRenamed: () => setState(() {}),
+            : null,
+        onPlay: () {
+          audioHandler.playPlaylistSong(
+            playlist: playlistForQueue,
+            songIndex: index,
+          );
+        },
+        borderRadius: borderRadius,
+        playlistId: isUserCreatedPlaylist ? playlistId : null,
+        onRenamed: () => setState(() {}),
+      ),
     );
   }
 }

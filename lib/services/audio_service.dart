@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/io_service.dart' show FilePaths;
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
@@ -1284,20 +1285,18 @@ class MusifyAudioHandler extends BaseAudioHandler {
   Future<bool> _resolveOfflineAndSetPaths(Map songData) async {
     try {
       final ytid = songData['ytid']?.toString();
-      if (ytid != null && ytid.isNotEmpty) {
-        final offlineSong = getOfflineSongByYtid(ytid);
-        if (offlineSong.isNotEmpty) {
-          final audioPath = offlineSong['audioPath']?.toString();
-          if (audioPath != null && audioPath.isNotEmpty) {
-            final f = File(audioPath);
-            if (await f.exists()) {
-              songData['audioPath'] = audioPath;
-              if (offlineSong['artworkPath'] != null) {
-                songData['artworkPath'] = offlineSong['artworkPath'];
-              }
-              return true;
-            }
+      if (ytid != null && ytid.isNotEmpty && isSongAlreadyOffline(ytid)) {
+        // Construct paths from current application directory
+        final audioPath = FilePaths.getAudioPath(ytid);
+        final artworkPath = FilePaths.getArtworkPath(ytid);
+        final audioFile = File(audioPath);
+
+        if (await audioFile.exists()) {
+          songData['audioPath'] = audioPath;
+          if (File(artworkPath).existsSync()) {
+            songData['artworkPath'] = artworkPath;
           }
+          return true;
         }
       }
     } catch (e, st) {
@@ -1449,33 +1448,26 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<String?> _getOfflineSongUrl(Map song) async {
-    final audioPath = song['audioPath'];
-    if (audioPath == null || audioPath.isEmpty) {
-      logger.log('Missing audioPath for offline song: ${song['ytid']}');
-      return null;
-    }
+    final ytid = song['ytid']?.toString();
 
-    final file = File(audioPath);
-    if (await file.exists()) {
-      return audioPath;
-    }
-
-    logger.log('Offline audio file not found: $audioPath');
-
-    final offlineSong = userOfflineSongs.firstWhere(
-      (s) => s['ytid'] == song['ytid'],
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (offlineSong.isNotEmpty && offlineSong['audioPath'] != null) {
-      final fallbackPath = offlineSong['audioPath'];
-      final fallbackFile = File(fallbackPath);
-      if (await fallbackFile.exists()) {
-        song['audioPath'] = fallbackPath;
-        return fallbackPath;
+    // Try constructing from current application directory first
+    if (ytid != null && ytid.isNotEmpty && isSongAlreadyOffline(ytid)) {
+      final currentPath = FilePaths.getAudioPath(ytid);
+      final currentFile = File(currentPath);
+      if (await currentFile.exists()) {
+        song['audioPath'] = currentPath;
+        return currentPath;
       }
     }
 
+    // Fallback: try stored audioPath if it still exists
+    final storedPath = song['audioPath']?.toString();
+    if (storedPath != null && storedPath.isNotEmpty) {
+      final storedFile = File(storedPath);
+      if (await storedFile.exists()) return storedPath;
+    }
+
+    logger.log('Offline audio file not found for ytid=$ytid');
     return null;
   }
 

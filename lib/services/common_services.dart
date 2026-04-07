@@ -304,6 +304,22 @@ Map<String, dynamic> getOfflineSongByYtid(String ytid) {
   }
 }
 
+/// Resolves the local artwork path for a song if it's available offline.
+/// Constructs the path from the current application directory and ytid,
+/// avoiding stale absolute paths from backups or reinstalls.
+/// Returns null if the song is not offline or the file doesn't exist.
+String? resolveOfflineArtworkPath(dynamic song) {
+  final ytid = song['ytid']?.toString();
+  if (ytid == null || ytid.isEmpty) return null;
+
+  // Check if this song is registered in offline songs
+  if (!isSongAlreadyOffline(ytid)) return null;
+
+  // Construct path from current application directory
+  final currentPath = FilePaths.getArtworkPath(ytid);
+  return File(currentPath).existsSync() ? currentPath : null;
+}
+
 Future<List<String>> getSearchSuggestions(String query) async {
   // Custom implementation:
 

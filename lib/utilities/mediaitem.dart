@@ -19,8 +19,11 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/io_service.dart' show FilePaths;
 
 Map mediaItemToMap(MediaItem mediaItem) {
   final extras = mediaItem.extras;
@@ -38,13 +41,20 @@ Map mediaItemToMap(MediaItem mediaItem) {
 
 MediaItem mapToMediaItem(Map song) {
   final ytid = song['ytid']?.toString();
-  final offlineSong = ytid != null
-      ? getOfflineSongByYtid(ytid)
-      : <String, dynamic>{};
-  final isOffline = offlineSong.isNotEmpty;
+  final isOffline = ytid != null && isSongAlreadyOffline(ytid);
 
-  final artUri = isOffline && offlineSong['artworkPath'] != null
-      ? Uri.file(offlineSong['artworkPath'].toString())
+  // Construct paths from current application directory, not from stored paths
+  String? currentArtworkPath;
+  String? currentAudioPath;
+  var artworkFileExists = false;
+  if (isOffline) {
+    currentArtworkPath = FilePaths.getArtworkPath(ytid);
+    currentAudioPath = FilePaths.getAudioPath(ytid);
+    artworkFileExists = File(currentArtworkPath).existsSync();
+  }
+
+  final artUri = artworkFileExists
+      ? Uri.file(currentArtworkPath!)
       : Uri.parse(song['highResImage'].toString());
 
   return MediaItem(
@@ -60,10 +70,8 @@ MediaItem mapToMediaItem(Map song) {
       'ytid': song['ytid'],
       'isLive': song['isLive'],
       'highResImage': song['highResImage'],
-      'artWorkPath':
-          (isOffline ? offlineSong['artworkPath'] : song['highResImage'])
-              ?.toString() ??
-          '',
+      'artWorkPath': artworkFileExists ? currentArtworkPath : '',
+      'audioPath': currentAudioPath,
     },
   );
 }

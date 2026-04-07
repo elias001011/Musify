@@ -94,9 +94,11 @@ class _SongBarState extends State<SongBar> {
     // Cache frequently accessed values
     _songTitle = widget.song['title'] ?? '';
     _songArtist = widget.song['artist']?.toString() ?? '';
-    _artworkPath = widget.song['artworkPath'];
     _lowResImageUrl = widget.song['lowResImage']?.toString() ?? '';
     _ytid = widget.song['ytid'] ?? '';
+
+    // Resolve artwork from offline songs if available
+    _artworkPath = resolveOfflineArtworkPath(widget.song);
 
     // Initialize ValueNotifiers only once
     _songLikeStatus = ValueNotifier(isSongAlreadyLiked(_ytid));

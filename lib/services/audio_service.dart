@@ -38,9 +38,12 @@ import 'package:rxdart/rxdart.dart';
 
 class MusifyAudioHandler extends BaseAudioHandler {
   MusifyAudioHandler() {
-    _androidEqualizer = AndroidEqualizer();
+    final androidEqualizer = Platform.isAndroid ? AndroidEqualizer() : null;
+    _androidEqualizer = androidEqualizer;
     audioPlayer = AudioPlayer(
-      audioPipeline: AudioPipeline(androidAudioEffects: [_androidEqualizer]),
+      audioPipeline: androidEqualizer == null
+          ? null
+          : AudioPipeline(androidAudioEffects: [androidEqualizer]),
       audioLoadConfiguration: const AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
           maxBufferDuration: Duration(seconds: 60),
@@ -63,7 +66,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
     _initialize();
   }
 
-  late final AndroidEqualizer _androidEqualizer;
+  late final AndroidEqualizer? _androidEqualizer;
   late final AudioPlayer audioPlayer;
   bool _equalizerInitialized = false;
   Future<bool>? _equalizerInitFuture;
@@ -320,6 +323,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<bool> _ensureEqualizerConfigured({bool force = false}) async {
+    if (_androidEqualizer == null) return false;
     if (_equalizerInitialized) return true;
 
     final now = DateTime.now();
@@ -345,8 +349,11 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<bool> _configureEqualizer() async {
+    final equalizer = _androidEqualizer;
+    if (equalizer == null) return false;
+
     try {
-      final params = await _androidEqualizer.parameters.timeout(
+      final params = await equalizer.parameters.timeout(
         const Duration(seconds: 3),
       );
 
@@ -361,7 +368,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
         }
       }
 
-      await _androidEqualizer.setEnabled(equalizerEnabled.value);
+      await equalizer.setEnabled(equalizerEnabled.value);
       _equalizerInitialized = true;
       _equalizerRetryNotBefore = DateTime.fromMillisecondsSinceEpoch(0);
       return true;
@@ -379,12 +386,13 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<AndroidEqualizerParameters?> getEqualizerParameters() async {
+    final equalizer = _androidEqualizer;
+    if (equalizer == null) return null;
+
     final initialized = await _ensureEqualizerConfigured();
     if (!initialized) return null;
     try {
-      return await _androidEqualizer.parameters.timeout(
-        const Duration(seconds: 2),
-      );
+      return await equalizer.parameters.timeout(const Duration(seconds: 2));
     } catch (e, stackTrace) {
       logger.log(
         'Failed to get equalizer parameters',
@@ -396,10 +404,13 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> setEqualizerEnabled(bool enabled) async {
+    final equalizer = _androidEqualizer;
+    if (equalizer == null) return;
+
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
     try {
-      await _androidEqualizer.setEnabled(enabled);
+      await equalizer.setEnabled(enabled);
       equalizerEnabled.value = enabled;
       unawaited(addOrUpdateData('settings', 'equalizerEnabled', enabled));
     } catch (e, stackTrace) {
@@ -412,11 +423,14 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> setEqualizerBandGain(int index, double gain) async {
+    final equalizer = _androidEqualizer;
+    if (equalizer == null) return;
+
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
 
     try {
-      final params = await _androidEqualizer.parameters;
+      final params = await equalizer.parameters;
       if (index < 0 || index >= params.bands.length) {
         return;
       }
@@ -437,11 +451,14 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> resetEqualizerBands() async {
+    final equalizer = _androidEqualizer;
+    if (equalizer == null) return;
+
     final initialized = await _ensureEqualizerConfigured(force: true);
     if (!initialized) return;
 
     try {
-      final params = await _androidEqualizer.parameters;
+      final params = await equalizer.parameters;
       for (final band in params.bands) {
         await band.setGain(0);
       }

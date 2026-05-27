@@ -51,10 +51,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 late MusifyAudioHandler audioHandler;
-late StreamSubscription<String?> sharingIntentSubscription;
+StreamSubscription<String?>? sharingIntentSubscription;
 
 final logger = Logger();
 final appLinks = AppLinks();
+
+bool get _supportsSharingIntent =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
 
 bool isFdroidBuild = false;
 bool isUpdateChecked = false;
@@ -126,24 +131,26 @@ class _MusifyState extends State<Musify> {
 
     offlineMode.addListener(_onOfflineModeChanged);
 
-    sharingIntentSubscription = ReceiveSharingIntent.getTextStream().listen(
-      (String? value) async {
-        await consumeYoutubeSharedTextIntent(
-          value,
-          audioHandler: audioHandler,
-          onError: (error, stackTrace) {
-            logger.log(
-              'Error while playing shared song:',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          },
-        );
-      },
-      onError: (err) {
-        logger.log('getTextStream error:', error: err);
-      },
-    );
+    if (_supportsSharingIntent) {
+      sharingIntentSubscription = ReceiveSharingIntent.getTextStream().listen(
+        (String? value) async {
+          await consumeYoutubeSharedTextIntent(
+            value,
+            audioHandler: audioHandler,
+            onError: (error, stackTrace) {
+              logger.log(
+                'Error while playing shared song:',
+                error: error,
+                stackTrace: stackTrace,
+              );
+            },
+          );
+        },
+        onError: (err) {
+          logger.log('getTextStream error:', error: err);
+        },
+      );
+    }
 
     try {
       LicenseRegistry.addLicense(() async* {
@@ -192,7 +199,7 @@ class _MusifyState extends State<Musify> {
     offlineMode.removeListener(_onOfflineModeChanged);
 
     Hive.close();
-    sharingIntentSubscription.cancel();
+    sharingIntentSubscription?.cancel();
     super.dispose();
   }
 

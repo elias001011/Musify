@@ -6,7 +6,9 @@ APP_DISPLAY_NAME="Musify"
 BUNDLE_DIR="build/linux/x64/release/bundle"
 DIST_DIR="build/desktop-artifacts"
 VERSION="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
-PACKAGE_ROOT="build/linux-package/${APP_NAME}_${VERSION}_amd64"
+DEB_REVISION="${DEB_REVISION:-1}"
+PACKAGE_VERSION="${VERSION}-${DEB_REVISION}"
+PACKAGE_ROOT="build/linux-package/${APP_NAME}_${PACKAGE_VERSION}_amd64"
 APP_DIR="${PACKAGE_ROOT}/usr/lib/${APP_NAME}"
 
 if [[ ! -x "${BUNDLE_DIR}/${APP_NAME}" ]]; then
@@ -42,13 +44,13 @@ DESKTOP
 INSTALLED_SIZE="$(du -sk "${PACKAGE_ROOT}/usr" | cut -f1)"
 cat > "${PACKAGE_ROOT}/DEBIAN/control" <<CONTROL
 Package: ${APP_NAME}
-Version: ${VERSION}
+Version: ${PACKAGE_VERSION}
 Section: sound
 Priority: optional
 Architecture: amd64
 Maintainer: Musify Contributors <noreply@github.com>
 Installed-Size: ${INSTALLED_SIZE}
-Depends: libgtk-3-0, libstdc++6
+Depends: libgtk-3-0, libstdc++6, libmpv2 | libmpv1 | libmpv-dev
 Description: Music streaming app made in Flutter
  Unofficial desktop build of Musify for Linux.
 CONTROL

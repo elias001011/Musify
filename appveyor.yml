@@ -20,40 +20,66 @@ environment:
 
 install:
   - ps: |
-      $ErrorActionPreference = "Stop"
+      function Assert-Success {
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+      }
       $flutterVersionMatch = Select-String -Path pubspec.yaml -Pattern '^\s+flutter:\s+\^?(.+)$'
       $flutterVersion = $flutterVersionMatch.Matches[0].Groups[1].Value.Trim()
       if (Test-Path $env:FLUTTER_HOME) {
         Remove-Item -Recurse -Force $env:FLUTTER_HOME
       }
       git -c advice.detachedHead=false clone -q --depth 1 --branch $flutterVersion https://github.com/flutter/flutter.git $env:FLUTTER_HOME
+      Assert-Success
       $env:Path = "$env:FLUTTER_HOME\bin;$env:Path"
       flutter --version
+      Assert-Success
       flutter config --enable-windows-desktop
+      Assert-Success
       flutter doctor -v
+      Assert-Success
 
 before_build:
   - ps: |
+      function Assert-Success {
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+      }
       $env:Path = "$env:FLUTTER_HOME\bin;$env:Path"
       flutter pub get
+      Assert-Success
 
 build_script:
   - ps: |
-      $ErrorActionPreference = "Stop"
+      function Assert-Success {
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+      }
       $env:Path = "$env:FLUTTER_HOME\bin;$env:Path"
       flutter build windows --release
+      Assert-Success
 
 after_build:
   - ps: |
-      $ErrorActionPreference = "Stop"
+      function Assert-Success {
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+      }
       $appVersionMatch = Select-String -Path pubspec.yaml -Pattern '^version:\s+([^+\s]+)'
       $env:MUSIFY_VERSION = $appVersionMatch.Matches[0].Groups[1].Value.Trim()
 
       New-Item -ItemType Directory -Force -Path build\desktop-artifacts | Out-Null
       7z a build\desktop-artifacts\Musify-windows-x64-portable.zip .\build\windows\x64\runner\Release\*
+      Assert-Success
 
       choco install innosetup -y --no-progress
+      Assert-Success
       & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\musify.iss
+      Assert-Success
 
 artifacts:
   - path: build\desktop-artifacts\Musify-windows-x64-portable.zip

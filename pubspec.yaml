@@ -31,6 +31,9 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.2
   just_audio: 0.10.5
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
+  media_kit_libs_windows_audio: ^1.0.9
   path_provider: ^2.1.5
   receive_sharing_intent:
     path: ./packages/receive_sharing_intent

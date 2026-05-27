@@ -30,6 +30,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/audio_service.dart';
@@ -246,6 +247,7 @@ class _MusifyState extends State<Musify> {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  JustAudioMediaKit.ensureInitialized();
   await initialisation();
 
   runApp(const Musify());

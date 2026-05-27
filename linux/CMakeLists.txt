@@ -54,6 +54,10 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 
+# Avoid building media_kit's optional static mimalloc object. The Flutter Snap
+# toolchain can inject older linker libraries that break this nested C build.
+set(MIMALLOC_USE_STATIC_LIBS OFF)
+
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 

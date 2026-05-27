@@ -41,8 +41,8 @@ Then create a desktop release:
 gh workflow run desktop_release.yml --ref master -f tag=desktop-v<version> -f prerelease=false
 ```
 
-If Actions is still blocked, build locally on Linux and use AppVeyor or a
-Windows machine for the Windows assets, then upload the files manually:
+If Actions is still blocked, build Linux locally and use a Windows machine for
+the Windows assets, then upload the files manually:
 
 ```bash
 flutter build linux --release

@@ -26,7 +26,7 @@ install:
       if (Test-Path $env:FLUTTER_HOME) {
         Remove-Item -Recurse -Force $env:FLUTTER_HOME
       }
-      git clone --depth 1 --branch $flutterVersion https://github.com/flutter/flutter.git $env:FLUTTER_HOME
+      git clone -q --depth 1 --branch $flutterVersion https://github.com/flutter/flutter.git $env:FLUTTER_HOME
       $env:Path = "$env:FLUTTER_HOME\bin;$env:Path"
       flutter --version
       flutter config --enable-windows-desktop

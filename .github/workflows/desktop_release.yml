@@ -1,0 +1,176 @@
+name: Build Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag. Defaults to desktop-v<pubspec version>."
+        required: false
+        type: string
+      prerelease:
+        description: "Mark the GitHub release as a prerelease."
+        required: false
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev dpkg-dev
+
+      - name: Resolve Flutter version
+        run: |
+          flutter_version="$(sed -n 's/^  flutter: //p' pubspec.yaml | sed 's/^\^//')"
+          echo "FLUTTER_VERSION=${flutter_version}" >> "$GITHUB_ENV"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "${{ env.FLUTTER_VERSION }}"
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      - name: Package Linux release
+        run: .github/scripts/package_linux_desktop.sh
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: musify-linux-x64
+          path: build/desktop-artifacts/Musify-linux-x64.*
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Resolve Flutter version
+        shell: pwsh
+        run: |
+          $flutterVersion = Select-String -Path pubspec.yaml -Pattern '^\s+flutter:\s+\^?(.+)$'
+          "FLUTTER_VERSION=$($flutterVersion.Matches[0].Groups[1].Value)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Resolve app version
+        shell: pwsh
+        run: |
+          $appVersion = Select-String -Path pubspec.yaml -Pattern '^version:\s+([^+\s]+)'
+          "MUSIFY_VERSION=$($appVersion.Matches[0].Groups[1].Value)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "${{ env.FLUTTER_VERSION }}"
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package portable Windows release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\desktop-artifacts
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Musify-windows-x64-portable.zip -Force
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\musify.iss
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: musify-windows-x64
+          path: build/desktop-artifacts/Musify-windows-x64-*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - build-linux
+      - build-windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Resolve release settings
+        id: release
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
+        run: |
+          version="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+            prerelease="true"
+          else
+            tag="${INPUT_TAG:-desktop-v${version}}"
+            prerelease="${INPUT_PRERELEASE:-true}"
+          fi
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          ls -lh dist
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" dist/* --clobber
+            exit 0
+          fi
+
+          args=(
+            release create "${RELEASE_TAG}" dist/*
+            --title "Musify Desktop ${RELEASE_TAG}"
+            --notes "Unofficial desktop builds for Windows and Linux."
+          )
+
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            args+=(--target "${GITHUB_SHA}")
+          fi
+
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"

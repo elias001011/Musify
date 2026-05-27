@@ -39,136 +39,194 @@ const String checkUrl =
     'https://raw.githubusercontent.com/gokadzev/Musify/update/check.json';
 const String releasesUrl =
     'https://api.github.com/repos/gokadzev/Musify/releases/latest';
+const String desktopReleasesUrl =
+    'https://api.github.com/repos/elias001011/Musify-Desktop-Port/releases';
+const String desktopReleaseTagPrefix = 'desktop-v';
 const String downloadUrlKey = 'url';
 const String downloadUrlArm64Key = 'arm64url';
 const String downloadFilename = 'Musify.apk';
 
+bool get _checksDesktopReleases =>
+    !kIsWeb && (Platform.isLinux || Platform.isWindows);
+
 Future<void> checkAppUpdates() async {
   try {
-    final response = await http.get(Uri.parse(checkUrl));
-
-    if (response.statusCode != 200) {
-      logger.log(
-        'Fetch update API (checkUrl) call returned status code ${response.statusCode}',
-      );
-      return;
+    if (_checksDesktopReleases) {
+      await _checkDesktopAppUpdates();
+    } else {
+      await _checkAndroidAppUpdates();
     }
-
-    final map = json.decode(response.body) as Map<String, dynamic>;
-    announcementURL.value = map['announcementurl'];
-    final latestVersion = map['version'].toString();
-
-    if (!isLatestVersionHigher(appVersion, latestVersion)) {
-      return;
-    }
-
-    final releasesRequest = await http.get(Uri.parse(releasesUrl));
-
-    if (releasesRequest.statusCode != 200) {
-      logger.log(
-        'Fetch update API (releasesUrl) call returned status code ${response.statusCode}',
-      );
-      return;
-    }
-
-    final releasesResponse =
-        json.decode(releasesRequest.body) as Map<String, dynamic>;
-
-    await showDialog(
-      context: NavigationManager().context,
-      builder: (BuildContext context) {
-        final colorScheme = Theme.of(context).colorScheme;
-
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  FluentIcons.arrow_download_24_regular,
-                  color: colorScheme.onPrimaryContainer,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n!.appUpdateIsAvailable,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'V$latestVersion',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height / 2.5,
-                ),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SingleChildScrollView(
-                  child: AutoFormatText(text: releasesResponse['body']),
-                ),
-              ),
-            ],
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: <Widget>[
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.outline),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(context.l10n!.cancel),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                getDownloadUrl(map).then(
-                  (url) => {launchURL(Uri.parse(url)), Navigator.pop(context)},
-                );
-              },
-              icon: const Icon(FluentIcons.arrow_download_20_regular),
-              label: Text(context.l10n!.download),
-            ),
-          ],
-        );
-      },
-    );
   } catch (e, stackTrace) {
     logger.log('Error in checkAppUpdates', error: e, stackTrace: stackTrace);
   }
+}
+
+Future<void> _checkAndroidAppUpdates() async {
+  final response = await http.get(Uri.parse(checkUrl));
+
+  if (response.statusCode != 200) {
+    logger.log(
+      'Fetch update API (checkUrl) call returned status code ${response.statusCode}',
+    );
+    return;
+  }
+
+  final map = json.decode(response.body) as Map<String, dynamic>;
+  announcementURL.value = map['announcementurl'];
+  final latestVersion = map['version'].toString();
+
+  if (!isLatestVersionHigher(appVersion, latestVersion)) {
+    return;
+  }
+
+  final releasesRequest = await http.get(Uri.parse(releasesUrl));
+
+  if (releasesRequest.statusCode != 200) {
+    logger.log(
+      'Fetch update API (releasesUrl) call returned status code ${releasesRequest.statusCode}',
+    );
+    return;
+  }
+
+  final releasesResponse =
+      json.decode(releasesRequest.body) as Map<String, dynamic>;
+
+  await _showUpdateDialog(
+    latestVersion: latestVersion,
+    releaseBody: releasesResponse['body']?.toString() ?? '',
+    resolveDownloadUrl: () => getDownloadUrl(map),
+  );
+}
+
+Future<void> _checkDesktopAppUpdates() async {
+  final releasesRequest = await http.get(
+    Uri.parse(desktopReleasesUrl),
+    headers: const {'Accept': 'application/vnd.github+json'},
+  );
+
+  if (releasesRequest.statusCode != 200) {
+    logger.log(
+      'Fetch update API (desktopReleasesUrl) call returned status code ${releasesRequest.statusCode}',
+    );
+    return;
+  }
+
+  final releasesResponse = json.decode(releasesRequest.body) as List<dynamic>;
+  final release = releasesResponse.cast<Map<String, dynamic>>().firstWhere(
+    (release) => release['draft'] != true,
+    orElse: () => <String, dynamic>{},
+  );
+
+  if (release.isEmpty) return;
+
+  final latestVersion = _desktopVersionFromTag(release['tag_name'].toString());
+  if (!isLatestVersionHigher(appVersion, latestVersion)) {
+    return;
+  }
+
+  await _showUpdateDialog(
+    latestVersion: latestVersion,
+    releaseBody: release['body']?.toString() ?? '',
+    resolveDownloadUrl: () async => getDesktopDownloadUrl(release),
+  );
+}
+
+Future<void> _showUpdateDialog({
+  required String latestVersion,
+  required String releaseBody,
+  required Future<String> Function() resolveDownloadUrl,
+}) async {
+  await showDialog(
+    context: NavigationManager().context,
+    builder: (BuildContext context) {
+      final colorScheme = Theme.of(context).colorScheme;
+
+      return AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                FluentIcons.arrow_download_24_regular,
+                color: colorScheme.onPrimaryContainer,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.l10n!.appUpdateIsAvailable,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'V$latestVersion',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height / 2.5,
+              ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SingleChildScrollView(
+                child: AutoFormatText(text: releaseBody),
+              ),
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: <Widget>[
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: colorScheme.outline),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(context.l10n!.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final url = await resolveDownloadUrl();
+              await launchURL(Uri.parse(url));
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
+            },
+            icon: const Icon(FluentIcons.arrow_download_20_regular),
+            label: Text(context.l10n!.download),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 void showUpdateCheckDialog(BuildContext context) {
@@ -231,17 +289,16 @@ void showUpdateCheckDialog(BuildContext context) {
 }
 
 bool isLatestVersionHigher(String appVersion, String latestVersion) {
-  final parsedAppVersion = appVersion.split('.');
-  final parsedAppLatestVersion = latestVersion.split('.');
+  final parsedAppVersion = _versionParts(appVersion);
+  final parsedAppLatestVersion = _versionParts(latestVersion);
   final length = parsedAppVersion.length > parsedAppLatestVersion.length
       ? parsedAppVersion.length
       : parsedAppLatestVersion.length;
+
   for (var i = 0; i < length; i++) {
-    final value1 = i < parsedAppVersion.length
-        ? int.parse(parsedAppVersion[i])
-        : 0;
+    final value1 = i < parsedAppVersion.length ? parsedAppVersion[i] : 0;
     final value2 = i < parsedAppLatestVersion.length
-        ? int.parse(parsedAppLatestVersion[i])
+        ? parsedAppLatestVersion[i]
         : 0;
     if (value2 > value1) {
       return true;
@@ -251,6 +308,12 @@ bool isLatestVersionHigher(String appVersion, String latestVersion) {
   }
 
   return false;
+}
+
+List<int> _versionParts(String version) {
+  return RegExp(
+    r'\d+',
+  ).allMatches(version).map((match) => int.parse(match.group(0)!)).toList();
 }
 
 Future<String> getCPUArchitecture() async {
@@ -267,6 +330,36 @@ Future<String> getDownloadUrl(Map<String, dynamic> map) async {
       : map[downloadUrlKey].toString();
 
   return url;
+}
+
+String _desktopVersionFromTag(String tag) {
+  return tag
+      .replaceFirst(RegExp('^$desktopReleaseTagPrefix'), '')
+      .replaceFirst(RegExp('^v'), '');
+}
+
+String getDesktopDownloadUrl(Map<String, dynamic> release) {
+  final assets = (release['assets'] as List<dynamic>? ?? [])
+      .cast<Map<String, dynamic>>();
+  final preferredAssetNames = Platform.isWindows
+      ? const [
+          'Musify-windows-x64-setup.exe',
+          'Musify-windows-x64-portable.zip',
+        ]
+      : const ['Musify-linux-x64.deb', 'Musify-linux-x64.tar.gz'];
+
+  for (final name in preferredAssetNames) {
+    final asset = assets.firstWhere(
+      (asset) => asset['name'] == name,
+      orElse: () => <String, dynamic>{},
+    );
+    final downloadUrl = asset['browser_download_url']?.toString();
+    if (downloadUrl != null && downloadUrl.isNotEmpty) {
+      return downloadUrl;
+    }
+  }
+
+  return release['html_url'].toString();
 }
 
 /// Fetch only the announcement URL from the `check.json` file and set the

@@ -11,13 +11,17 @@ on:
         description: "Mark the GitHub release as a prerelease."
         required: false
         type: boolean
-        default: true
+        default: false
   push:
     tags:
       - "desktop-v*"
 
 permissions:
   contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build-linux:
@@ -47,6 +51,9 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Analyze Dart code
+        run: flutter analyze
+
       - name: Build Linux release
         run: flutter build linux --release
 
@@ -72,13 +79,13 @@ jobs:
         shell: pwsh
         run: |
           $flutterVersion = Select-String -Path pubspec.yaml -Pattern '^\s+flutter:\s+\^?(.+)$'
-          "FLUTTER_VERSION=$($flutterVersion.Matches[0].Groups[1].Value)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FLUTTER_VERSION=$($flutterVersion.Matches[0].Groups[1].Value.Trim())" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Resolve app version
         shell: pwsh
         run: |
           $appVersion = Select-String -Path pubspec.yaml -Pattern '^version:\s+([^+\s]+)'
-          "MUSIFY_VERSION=$($appVersion.Matches[0].Groups[1].Value)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "MUSIFY_VERSION=$($appVersion.Matches[0].Groups[1].Value.Trim())" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -95,7 +102,7 @@ jobs:
       - name: Package portable Windows release
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path build\desktop-artifacts
+          New-Item -ItemType Directory -Force -Path build\desktop-artifacts | Out-Null
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Musify-windows-x64-portable.zip -Force
 
       - name: Build Windows installer
@@ -135,42 +142,65 @@ jobs:
           INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
         run: |
           version="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
-            prerelease="true"
+            target="${GITHUB_SHA}"
+            prerelease="false"
           else
             tag="${INPUT_TAG:-desktop-v${version}}"
-            prerelease="${INPUT_PRERELEASE:-true}"
+            target="${GITHUB_SHA}"
+            prerelease="${INPUT_PRERELEASE:-false}"
           fi
 
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "target=${target}" >> "$GITHUB_OUTPUT"
           echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare checksums and notes
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          ls -lh dist
+          sha256sum dist/* > dist/SHA256SUMS.txt
+
+          cat > release-notes.md <<NOTES
+          Unofficial Musify Desktop Port release for Windows and Linux.
+
+          Built from this repository, based on upstream Musify by Valeri Gokadze:
+          https://github.com/gokadzev/Musify
+
+          Assets:
+          - Musify-linux-x64.deb
+          - Musify-linux-x64.tar.gz
+          - Musify-windows-x64-setup.exe
+          - Musify-windows-x64-portable.zip
+          - SHA256SUMS.txt
+
+          The desktop updater checks releases from:
+          https://github.com/elias001011/Musify-Desktop-Port/releases
+          NOTES
 
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TARGET: ${{ steps.release.outputs.target }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          ls -lh dist
+          release_args=(--title "Musify Desktop Port ${RELEASE_TAG}" --notes-file release-notes.md)
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            release_args+=(--prerelease)
+          else
+            release_args+=(--latest)
+          fi
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release upload "${RELEASE_TAG}" dist/* --clobber
+            gh release edit "${RELEASE_TAG}" "${release_args[@]}" --target "${RELEASE_TARGET}"
             exit 0
           fi
 
-          args=(
-            release create "${RELEASE_TAG}" dist/*
-            --title "Musify Desktop ${RELEASE_TAG}"
-            --notes "Unofficial desktop builds for Windows and Linux."
-          )
-
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
-            args+=(--target "${GITHUB_SHA}")
-          fi
-
-          if [[ "${PRERELEASE}" == "true" ]]; then
-            args+=(--prerelease)
-          fi
-
-          gh "${args[@]}"
+          gh release create "${RELEASE_TAG}" dist/* \
+            "${release_args[@]}" \
+            --target "${RELEASE_TARGET}"

@@ -1,0 +1,139 @@
+name: Sync Upstream Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: "Upstream Musify release tag. Empty means latest release."
+        required: false
+        type: string
+      release_after_sync:
+        description: "Dispatch desktop release workflow after a successful sync."
+        required: false
+        type: boolean
+        default: true
+  schedule:
+    - cron: "23 */6 * * *"
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync latest gokadzev/Musify release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout desktop port
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_UPSTREAM_TAG: ${{ github.event.inputs.upstream_tag }}
+        run: |
+          if [[ -n "${INPUT_UPSTREAM_TAG}" ]]; then
+            upstream_tag="${INPUT_UPSTREAM_TAG}"
+          else
+            upstream_tag="$(gh release view --repo gokadzev/Musify --json tagName --jq .tagName)"
+          fi
+
+          desktop_tag="desktop-v${upstream_tag#v}"
+
+          echo "upstream_tag=${upstream_tag}" >> "$GITHUB_OUTPUT"
+          echo "desktop_tag=${desktop_tag}" >> "$GITHUB_OUTPUT"
+
+          if gh release view "${desktop_tag}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Desktop release ${desktop_tag} already exists."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop when already released
+        if: steps.release.outputs.skip == 'true'
+        run: echo "No new upstream release to package."
+
+      - name: Add upstream remote
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          git remote add upstream https://github.com/gokadzev/Musify.git
+          git fetch upstream --tags --prune
+
+      - name: Merge upstream release
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          git checkout master
+          git merge --no-edit "refs/tags/${{ steps.release.outputs.upstream_tag }}"
+
+      - name: Resolve Flutter version
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          flutter_version="$(sed -n 's/^  flutter: //p' pubspec.yaml | sed 's/^\^//')"
+          echo "FLUTTER_VERSION=${flutter_version}" >> "$GITHUB_ENV"
+
+      - name: Set up Flutter
+        if: steps.release.outputs.skip != 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "${{ env.FLUTTER_VERSION }}"
+
+      - name: Refresh generated version and dependencies
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          chmod +x update.sh
+          ./update.sh
+          flutter pub get
+
+      - name: Analyze synced code
+        if: steps.release.outputs.skip != 'true'
+        run: flutter analyze
+
+      - name: Commit generated sync updates
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "Refresh desktop port after upstream ${{ steps.release.outputs.upstream_tag }}"
+          fi
+
+      - name: Push synced master
+        if: steps.release.outputs.skip != 'true'
+        run: git push origin master
+
+      - name: Dispatch desktop release workflow
+        if: steps.release.outputs.skip != 'true' && github.event.inputs.release_after_sync != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESKTOP_TAG: ${{ steps.release.outputs.desktop_tag }}
+        run: |
+          gh workflow run desktop_release.yml \
+            --ref master \
+            -f tag="${DESKTOP_TAG}" \
+            -f prerelease=false
+
+      - name: Open sync failure issue
+        if: failure() && steps.release.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ steps.release.outputs.upstream_tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "Upstream sync failed for ${UPSTREAM_TAG}" \
+            --body "Automatic sync from gokadzev/Musify ${UPSTREAM_TAG} failed. Run: ${RUN_URL}" || true

@@ -40,7 +40,7 @@ const String checkUrl =
 const String releasesUrl =
     'https://api.github.com/repos/gokadzev/Musify/releases/latest';
 const String desktopReleasesUrl =
-    'https://api.github.com/repos/elias001011/Musify-Desktop-Port/releases';
+    'https://api.github.com/repos/elias001011/Musify-Desktop-Port/releases/latest';
 const String desktopReleaseTagPrefix = 'desktop-v';
 const String downloadUrlKey = 'url';
 const String downloadUrlArm64Key = 'arm64url';
@@ -111,13 +111,7 @@ Future<void> _checkDesktopAppUpdates() async {
     return;
   }
 
-  final releasesResponse = json.decode(releasesRequest.body) as List<dynamic>;
-  final release = releasesResponse.cast<Map<String, dynamic>>().firstWhere(
-    (release) => release['draft'] != true,
-    orElse: () => <String, dynamic>{},
-  );
-
-  if (release.isEmpty) return;
+  final release = json.decode(releasesRequest.body) as Map<String, dynamic>;
 
   final latestVersion = _desktopVersionFromTag(release['tag_name'].toString());
   if (!isLatestVersionHigher(appVersion, latestVersion)) {

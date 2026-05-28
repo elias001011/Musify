@@ -1,58 +1,164 @@
-on: workflow_dispatch
-name: Test, Build and Pre Release apk
-env:
-  PROPERTIES_PATH: "./android/key.properties"
+name: Sync Pre-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild the next pre-release even if the release tag already exists."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pre-release-sync
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build APK
+  sync:
+    name: Sync latest gokadzev/Musify commit
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v5
-    # Setup Java environment in order to build the Android app.
-    - uses: actions/setup-java@v5
-      with:
-        distribution: 'zulu'
-        java-version: '17.x'
-    # Gradle cache for faster builds
-    - uses: actions/cache@v5
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-    # Setup the flutter environment.
-    - uses: subosito/flutter-action@v2
-      with:
-        channel: "stable"
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-    #
-    - run: |
-          echo keyPassword=\${{ secrets.KEY_STORE }} > ${{env.PROPERTIES_PATH}}
-          echo storePassword=\${{ secrets.KEY_PASSWORD }} >> ${{env.PROPERTIES_PATH}}
-          echo keyAlias=\${{ secrets.KEY_ALIAS }} >> ${{env.PROPERTIES_PATH}}
-    #
-    - run: echo "${{ secrets.KEYSTORE2 }}" | base64 --decode > android/app/key.jks
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    # Get flutter dependencies.
-    - run: flutter pub get
-    # Statically analyze the Dart code for any errors.
-    - run: flutter analyze .
-     # Build arm64 APK for GitHub pre-release
-    - name: Build arm64 APK
-      run: flutter build apk --release --split-per-abi --target-platform="android-arm64" --flavor github
-    # Pre-release arm64 generated APK
-    - name: Release arm64 APK
-      uses: svenstaro/upload-release-action@v2
-      with:
-        repo_name: gokadzev/Musify
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: build/app/outputs/flutter-apk/app-arm64-v8a-github-release.apk
-        asset_name: Musify-arm64-v8a.apk
-        tag: ${{ github.ref }}
-        prerelease: true
-        overwrite: true
-        body: "**New Musify Pre-Release!** \n
-        with pre-release / [BETA] builds you have access to the latest build of the app before it is released as stable-release version. Only use pre-release if you test the app, provide feedback, and help us improve its performance. Please note that pre-release versions of the app may be pretty unstable. You may experience crashes, bugs, or other issues while using the app. This is because pre-release version is still in development.
-        "
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/gokadzev/Musify.git
+          git fetch upstream master --tags --prune
+
+      - name: Resolve release tag
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: |
+          upstream_sha="$(git rev-parse refs/remotes/upstream/master)"
+          upstream_short="$(git rev-parse --short refs/remotes/upstream/master)"
+          version="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
+          release_tag="pre-release-v${version}-${upstream_short}"
+
+          echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
+          echo "upstream_short=${upstream_short}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${FORCE}" == "true" ]]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "${release_tag}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Pre-release ${release_tag} already exists."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop when already packaged
+        if: ${{ steps.target.outputs.skip == 'true' }}
+        run: echo "No new upstream commit to package."
+
+      - name: Sync pre-release branch
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: |
+          git checkout pre-release
+          git merge --no-edit refs/remotes/upstream/master
+
+      - name: Push pre-release branch
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: |
+          git push origin HEAD:refs/heads/pre-release
+
+      - name: Resolve Flutter version
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: |
+          flutter_version="$(sed -n 's/^  flutter: //p' pubspec.yaml | sed 's/^\^//')"
+          echo "FLUTTER_VERSION=${flutter_version}" >> "$GITHUB_ENV"
+
+      - name: Set up Java
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "${{ env.FLUTTER_VERSION }}"
+
+      - name: Get Flutter dependencies
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: flutter pub get
+
+      - name: Refresh generated version file
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: |
+          chmod +x update.sh
+          ./update.sh
+
+      - name: Analyze code
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        run: flutter analyze
+
+      - name: Build installable APKs
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        env:
+          BUILD_NAME: ${{ steps.target.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          flutter build apk \
+            --debug \
+            --flavor github \
+            --split-per-abi \
+            --build-name "${BUILD_NAME}" \
+            --build-number "${BUILD_NUMBER}"
+
+      - name: Prepare release notes
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.release_tag }}
+          UPSTREAM_SHA: ${{ steps.target.outputs.upstream_sha }}
+          UPSTREAM_SHORT: ${{ steps.target.outputs.upstream_short }}
+        run: |
+          cat > release-notes.md <<NOTES
+          Automated pre-release built from gokadzev/Musify commit ${UPSTREAM_SHA}.
+
+          This release was published from the \`pre-release\` branch and includes installable Android APKs for testing before a stable release.
+
+          Assets:
+          - build/app/outputs/flutter-apk/*.apk
+
+          Release tag: ${RELEASE_TAG}
+          Upstream commit: ${UPSTREAM_SHORT}
+          NOTES
+
+      - name: Publish GitHub release
+        if: ${{ steps.target.outputs.skip != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.target.outputs.release_tag }}
+          RELEASE_TARGET: ${{ steps.target.outputs.upstream_sha }}
+          RELEASE_TITLE: Musify Pre-release ${{ steps.target.outputs.version }} (${{ steps.target.outputs.upstream_short }})
+        run: |
+          release_args=(--title "${RELEASE_TITLE}" --notes-file release-notes.md --prerelease)
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" build/app/outputs/flutter-apk/*.apk --clobber
+            gh release edit "${RELEASE_TAG}" "${release_args[@]}" --target "${RELEASE_TARGET}"
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" build/app/outputs/flutter-apk/*.apk \
+            "${release_args[@]}" \
+            --target "${RELEASE_TARGET}"

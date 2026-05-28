@@ -35,7 +35,7 @@ jobs:
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/gokadzev/Musify.git
-          git fetch upstream master --tags --prune
+          git fetch upstream +refs/heads/master:refs/remotes/upstream/master --tags --prune
 
       - name: Resolve release tag
         id: target

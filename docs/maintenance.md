@@ -21,21 +21,6 @@ When GitHub Actions is available:
 If the upstream merge or analysis fails, the sync workflow opens an issue with a
 link to the failed run.
 
-## Pre-Release Flow
-
-When GitHub Actions is available:
-
-1. `Sync Pre-Releases` is manual-only and can be started when you want a new
-   pre-release build.
-2. It reads the latest commit from `gokadzev/Musify` and compares it with the
-   latest `pre-releases` release tag.
-3. If that pre-release already exists, it exits without changes.
-4. If the pre-release does not exist yet, it resets `pre-releases` to the latest
-   upstream commit and pushes that branch to this fork.
-5. It runs `update.sh`, `flutter pub get`, and `flutter analyze`.
-6. It builds installable Android APKs with a unique build number for the run.
-7. It publishes a new GitHub pre-release with the APKs attached.
-
 ## Manual Sync
 
 Use this when Actions is unavailable or a conflict needs local attention:

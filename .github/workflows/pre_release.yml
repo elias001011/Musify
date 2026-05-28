@@ -35,7 +35,7 @@ jobs:
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/gokadzev/Musify.git
-          git fetch upstream master
+          git fetch upstream +refs/heads/master:refs/remotes/upstream/master
 
       - name: Resolve release tag
         id: target
@@ -43,8 +43,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FORCE: ${{ github.event.inputs.force }}
         run: |
-          upstream_sha="$(git ls-remote upstream refs/heads/master | awk '{print $1}')"
-          upstream_short="${upstream_sha::7}"
+          upstream_sha="$(git rev-parse refs/remotes/upstream/master)"
+          upstream_short="$(git rev-parse --short refs/remotes/upstream/master)"
           version="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
           release_tag="pre-release-v${version}-${upstream_short}"
 
@@ -70,7 +70,7 @@ jobs:
         if: ${{ steps.target.outputs.skip != 'true' }}
         run: |
           git checkout pre-release
-          git merge --no-edit FETCH_HEAD
+          git merge --no-edit refs/remotes/upstream/master
 
       - name: Push pre-release branch
         if: ${{ steps.target.outputs.skip != 'true' }}

@@ -27,11 +27,19 @@ import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
-const artistCatalogCacheVersion = 14;
+// Bumped to 15 when the YouTube Music discography source was added so cached
+// Topic-only catalogs are not mixed with the richer Music catalogs.
+const artistCatalogCacheVersion = 15;
 const artistSearchCacheVersion = 9;
 const _maxArtistUploadPages = 500;
 const _artistRequestTimeout = Duration(seconds: 12);
 const _artistUploadsPlaylistTimeout = Duration(minutes: 3);
+
+// YouTube Music discography limits. Albums are fetched in small concurrent
+// batches so a full discography stays responsive without hammering YouTube.
+const _musicDiscographyTimeout = Duration(seconds: 20);
+const _musicAlbumTimeout = Duration(seconds: 12);
+const _musicAlbumBatchSize = 6;
 
 class _ArtistSource {
   const _ArtistSource(this.artist);
@@ -551,6 +559,140 @@ Future<List<Map<String, dynamic>>> _searchArtistChannels(
 }
 
 Future<List<Map<String, dynamic>>> _buildArtistCatalog(
+  Map<String, dynamic> artist,
+) async {
+  // Prefer the structured YouTube Music discography (artist -> albums/singles
+  // -> tracks). It matches what YouTube Music shows and includes releases that
+  // are missing from a Topic channel's flat uploads feed (e.g. older albums
+  // such as Michael Jackson's "XSCAPE"). It is just as low-noise as the
+  // Topic-only approach because YouTube Music only lists official releases.
+  final musicCatalog = await _buildArtistCatalogFromMusic(artist);
+  if (musicCatalog.isNotEmpty) return musicCatalog;
+
+  // Fallback to the PR's Topic-only uploads approach if YouTube Music returned
+  // nothing (artist has no Music presence, layout changed, request failed...).
+  return _buildArtistCatalogFromTopicUploads(artist);
+}
+
+/// Builds the catalog from the YouTube Music artist page
+/// (albums/singles/EPs -> official tracks). Returns an empty list (never
+/// throws) so the caller can fall back to the Topic-only approach.
+Future<List<Map<String, dynamic>>> _buildArtistCatalogFromMusic(
+  Map<String, dynamic> artist,
+) async {
+  final artistId = artist['ytid']?.toString() ?? '';
+  if (!_isChannelId(artistId)) return [];
+
+  final artistName = normalizeArtistDisplayTitle(
+    artist['title']?.toString() ??
+        artist['sourceTitle']?.toString() ??
+        artist['lookupTitle']?.toString() ??
+        '',
+  );
+
+  // Only the canonical YouTube Music artist channel exposes a complete
+  // discography; an arbitrary "- Topic" channel does not. Resolve it strictly
+  // by name so we never attach another artist's catalog (keeps it low-noise).
+  final canonicalId = await _resolveMusicArtistChannelId(artistId, artistName);
+  if (canonicalId == null) return [];
+
+  try {
+    final releases = await ytClient.music
+        .getArtistReleases(canonicalId)
+        .timeout(_musicDiscographyTimeout);
+
+    if (releases.isEmpty) {
+      logger.log(
+        'YouTube Music discography empty for '
+        '${artist['title']} ($artistId); falling back to Topic uploads',
+      );
+      return [];
+    }
+
+    final songs = <Map<String, dynamic>>[];
+    for (var i = 0; i < releases.length; i += _musicAlbumBatchSize) {
+      final batch = releases.skip(i).take(_musicAlbumBatchSize);
+      final batchResults = await Future.wait(
+        batch.map(
+          (album) => _loadAlbumSongs(album, canonicalId, artistName),
+        ),
+      );
+      for (final albumSongs in batchResults) {
+        songs.addAll(albumSongs);
+      }
+    }
+
+    final catalog = dedupeArtistCatalogSongs(songs);
+    logger.log(
+      'YouTube Music catalog for ${artist['title']} ($artistId): '
+      '${releases.length} releases -> ${catalog.length} tracks',
+    );
+    return catalog;
+  } catch (e, stackTrace) {
+    logger.log(
+      'YouTube Music discography failed for ${artist['title']} ($artistId); '
+      'falling back to Topic uploads',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return [];
+  }
+}
+
+Future<String?> _resolveMusicArtistChannelId(
+  String artistId,
+  String artistName,
+) async {
+  if (artistName.trim().isEmpty) {
+    // No reliable name to match against; only trust an explicit channel id.
+    return _isChannelId(artistId) ? artistId : null;
+  }
+
+  try {
+    final candidates = await ytClient.music
+        .searchArtists(artistName)
+        .timeout(_artistRequestTimeout);
+    for (final candidate in candidates) {
+      if (candidate.id.isEmpty) continue;
+      if (_strictSameArtistTitle(candidate.name, artistName)) {
+        return candidate.id;
+      }
+    }
+    logger.log(
+      'No strict YouTube Music artist match for "$artistName" '
+      '($artistId); falling back to Topic uploads',
+    );
+  } catch (e, stackTrace) {
+    logger.log(
+      'YouTube Music artist search failed for "$artistName"',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+  return null;
+}
+
+Future<List<Map<String, dynamic>>> _loadAlbumSongs(
+  MusicAlbum album,
+  String channelId,
+  String artistName,
+) async {
+  try {
+    final tracks = await ytClient.music
+        .getAlbumTracks(album.id, author: artistName, channelId: channelId)
+        .timeout(_musicAlbumTimeout);
+    return [for (final track in tracks) returnSongLayout(0, track)];
+  } catch (e, stackTrace) {
+    logger.log(
+      'Could not load YouTube Music album ${album.title} (${album.id})',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return [];
+  }
+}
+
+Future<List<Map<String, dynamic>>> _buildArtistCatalogFromTopicUploads(
   Map<String, dynamic> artist,
 ) async {
   final sources = await _officialArtistSources(artist);

@@ -1,4 +1,5 @@
 import 'channels/channels.dart';
+import 'music/music_client.dart';
 import 'playlists/playlist_client.dart';
 import 'reverse_engineering/challenges/js_challenge.dart';
 import 'reverse_engineering/youtube_http_client.dart';
@@ -21,6 +22,9 @@ class YoutubeExplode {
   /// YouTube search queries.
   late final SearchClient search;
 
+  /// YouTube Music browse queries (artist discography, album tracks).
+  late final MusicClient music;
+
   late final BaseJSChallengeSolver? _jsSolver;
 
   /// Initializes an instance of [YoutubeClient].
@@ -33,6 +37,7 @@ class YoutubeExplode {
     playlists = PlaylistClient(_httpClient);
     channels = ChannelClient(_httpClient);
     search = SearchClient(_httpClient);
+    music = MusicClient(_httpClient);
   }
 
   /// Closes the HttpClient assigned to this [YoutubeHttpClient].

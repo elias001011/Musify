@@ -1544,16 +1544,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
           return;
         }
       }
-      unawaited(
-        audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
-          logger.log(
-            'Error starting playback',
-            error: e,
-            stackTrace: stackTrace,
-          );
-          _lastError = e.toString();
-        }),
-      );
+      await audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
+        logger.log('Error starting playback', error: e, stackTrace: stackTrace);
+        _lastError = e.toString();
+      });
       listeningStatsService.resumeListeningSession(currentSong: currentSong);
     } catch (e, stackTrace) {
       logger.log('Error in play()', error: e, stackTrace: stackTrace);
@@ -1872,16 +1866,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
         _updateCurrentMediaItemWithDuration(audioPlayer.duration!);
       }
 
-      unawaited(
-        audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
-          logger.log(
-            'Error starting playback',
-            error: e,
-            stackTrace: stackTrace,
-          );
-          _lastError = e.toString();
-        }),
-      );
+      await audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
+        logger.log('Error starting playback', error: e, stackTrace: stackTrace);
+        _lastError = e.toString();
+      });
       listeningStatsService.startListeningSession(
         song,
         duration: audioPlayer.duration,

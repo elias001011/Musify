@@ -253,9 +253,9 @@ class _RecapSongArtwork extends StatelessWidget {
     ]);
 
     final imageUrl = _firstNonEmptyString([
-      song['lowResImage'],
-      song['image'],
       song['highResImage'],
+      song['image'],
+      song['lowResImage'],
     ]);
 
     return SizedBox(
@@ -278,20 +278,18 @@ class _RecapSongArtwork extends StatelessWidget {
     final remoteArtworkUrl =
         _remoteImageUrl(imageUrl) ?? _remoteImageUrl(artworkPath);
     if (remoteArtworkUrl != null) {
-      final isImageSmall = remoteArtworkUrl.contains('default.jpg');
       return CachedNetworkImage(
         imageUrl: remoteArtworkUrl,
         width: size,
         height: size,
-        fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
+        fit: BoxFit.cover,
         memCacheWidth: cacheExtent,
         memCacheHeight: cacheExtent,
         imageBuilder: (_, imageProvider) => Image(
           image: imageProvider,
           width: size,
           height: size,
-          fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-          centerSlice: isImageSmall ? const Rect.fromLTRB(1, 1, 1, 1) : null,
+          fit: BoxFit.cover,
         ),
         placeholder: (_, __) => _fallback(),
         errorWidget: (_, __, ___) => _fallback(),
@@ -430,23 +428,30 @@ class _FeaturedSongPreviewRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (playCount > 0) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    FluentIcons.headphones_20_filled,
-                    size: 15,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$playCount',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                if (playCount > 0)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 8),
+                        Icon(
+                          FluentIcons.headphones_20_filled,
+                          size: 15,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$playCount',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -527,23 +532,30 @@ class _SongPreviewRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (playCount > 0) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    FluentIcons.headphones_20_filled,
-                    size: 14,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$playCount',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                if (playCount > 0)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 8),
+                        Icon(
+                          FluentIcons.headphones_20_filled,
+                          size: 14,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$playCount',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
               ],
             ),
           ),

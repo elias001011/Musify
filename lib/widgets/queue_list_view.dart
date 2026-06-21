@@ -515,9 +515,18 @@ class _ArtworkThumbnail extends StatelessWidget {
       width: size,
       height: size,
       imageUrl: imageUrl,
+      // The imageBuilder replaces the default rendering, so the outer
+      // width/height no longer constrain it. Size the Image explicitly so a
+      // non-square thumbnail is framed (BoxFit.cover) instead of laying out at
+      // its intrinsic aspect ratio (which showed as stretched/letterboxed art).
       imageBuilder: (_, imageProvider) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
-        child: Image(image: imageProvider, fit: BoxFit.cover),
+        child: Image(
+          image: imageProvider,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
       ),
       placeholder: (_, __) => _loading(),
       errorWidget: (_, __, ___) => _fallback(),

@@ -52,6 +52,11 @@ class ListeningStatsService {
   bool _sessionQualified = false;
   bool _sessionLastAudioPlayerPlaying = false;
 
+  // DEBUG: verbose logging for the Wrapped/listening-stats feature. Every line
+  // is prefixed with [WrappedDbg] so it can be filtered in the console or in the
+  // app's "copy logs" output. This whole branch is for behavior validation only.
+  void _wrapLog(String message) => logger.log('[WrappedDbg] $message');
+
   bool get hasStats {
     final now = DateTime.now();
     final stats = _readStats(now);
@@ -113,15 +118,28 @@ class ListeningStatsService {
   }
 
   void recordListeningTime(Duration listenedDuration, {DateTime? listenedAt}) {
-    if (!wrappedEnabled.value) return;
+    if (!wrappedEnabled.value) {
+      _wrapLog('recordListeningTime: skipped (wrapped disabled)');
+      return;
+    }
     if (listenedDuration <= Duration.zero) return;
 
     _listeningTimeRemainder += listenedDuration;
     final wholeSeconds = _listeningTimeRemainder.inSeconds;
-    if (wholeSeconds <= 0) return;
+    if (wholeSeconds <= 0) {
+      _wrapLog(
+        'recordListeningTime: +${listenedDuration.inMilliseconds}ms buffered, '
+        'remainder=${_listeningTimeRemainder.inMilliseconds}ms (<1s, not committed)',
+      );
+      return;
+    }
     _listeningTimeRemainder -= Duration(seconds: wholeSeconds);
 
     final now = listenedAt ?? DateTime.now();
+    _wrapLog(
+      'recordListeningTime: committing ${wholeSeconds}s to totals at $now '
+      '(carry=${_listeningTimeRemainder.inMilliseconds}ms)',
+    );
     _stats = applyListeningTimeDelta(
       _readStats(now),
       listenedDuration: Duration(seconds: wholeSeconds),
@@ -140,6 +158,10 @@ class ListeningStatsService {
     if (!wrappedEnabled.value) return;
 
     final now = listenedAt ?? DateTime.now();
+    _wrapLog(
+      'recordListening: song=${song['ytid']} listened=${listenedDuration.inSeconds}s '
+      'incrementPlayCount=$incrementPlayCount countTotalSeconds=$countTotalSeconds',
+    );
     _stats = applyListeningStatsDelta(
       _readStats(now),
       song: song,
@@ -159,6 +181,10 @@ class ListeningStatsService {
   ) {
     if (_sessionSongId == currentSongYtid) {
       _sessionDuration = duration;
+      _wrapLog(
+        'updateListeningSessionDuration: song=$currentSongYtid '
+        'duration=${duration.inSeconds}s',
+      );
     }
   }
 
@@ -181,6 +207,11 @@ class ListeningStatsService {
     // A session is started only once playback has begun, so mark it playing now;
     // otherwise ticks before the next playerState transition would be dropped.
     _sessionLastAudioPlayerPlaying = true;
+    _wrapLog(
+      'startListeningSession: song=$ytid duration=${_sessionDuration?.inSeconds}s '
+      'qualifyThreshold=${qualifiedPlaybackThreshold(_sessionDuration).inSeconds}s '
+      'startedAt=$_sessionLastTick',
+    );
   }
 
   void resumeListeningSession({Map? currentSong}) {
@@ -198,6 +229,10 @@ class ListeningStatsService {
       // pre-transition value (false). We just got a "playing" event for a
       // different song, meaning the previous one was playing up to this tick;
       // pass wasPlaying: true explicitly so its final tick isn't dropped.
+      _wrapLog(
+        'resumeListeningSession: song changed ($_sessionSongId -> $ytid); '
+        'finishing previous session then starting new one',
+      );
       finishListeningSession(countCurrentTick: true, wasPlaying: true);
       startListeningSession(song);
       return;
@@ -205,26 +240,43 @@ class ListeningStatsService {
 
     _sessionLastTick = DateTime.now();
     _sessionLastAudioPlayerPlaying = true;
+    _wrapLog('resumeListeningSession: resumed same song=$ytid, tick reset');
   }
 
   void recordListeningSessionProgress({
     bool? wasPlaying,
   }) {
     final song = _sessionSong;
-    if (song == null) return;
+    if (song == null) {
+      _wrapLog('tick: skipped (no active session)');
+      return;
+    }
 
     final now = DateTime.now();
     final lastTick = _sessionLastTick;
     _sessionLastTick = now;
-    if (lastTick == null) return;
+    if (lastTick == null) {
+      _wrapLog('tick: skipped (no lastTick) song=$_sessionSongId');
+      return;
+    }
 
     final shouldCount = wasPlaying ?? _sessionLastAudioPlayerPlaying;
+    final listenedDuration = now.difference(lastTick);
+    _wrapLog(
+      'tick: song=$_sessionSongId elapsed=${listenedDuration.inMilliseconds}ms '
+      'wasPlaying=$wasPlaying flag=$_sessionLastAudioPlayerPlaying '
+      'shouldCount=$shouldCount sessionListened=${_sessionListened.inSeconds}s '
+      'qualified=$_sessionQualified',
+    );
     if (!shouldCount) return;
 
-    final listenedDuration = now.difference(lastTick);
-    if (listenedDuration <= Duration.zero) return;
+    if (listenedDuration <= Duration.zero) {
+      _wrapLog('tick: skipped (non-positive elapsed)');
+      return;
+    }
 
     if (!wrappedEnabled.value) {
+      _wrapLog('tick: skipped (wrapped disabled)');
       return;
     }
 
@@ -237,6 +289,12 @@ class ListeningStatsService {
     if (!_sessionQualified) {
       if (_sessionListened >= qualifiedPlaybackThreshold(_sessionDuration)) {
         _sessionQualified = true;
+        _wrapLog(
+          'tick: session QUALIFIED song=$_sessionSongId '
+          'sessionListened=${_sessionListened.inSeconds}s '
+          'threshold=${qualifiedPlaybackThreshold(_sessionDuration).inSeconds}s '
+          '-> playCount++',
+        );
         recordListening(
           song,
           _sessionListened,
@@ -262,6 +320,10 @@ class ListeningStatsService {
   }) {
     if (state.playing == _sessionLastAudioPlayerPlaying) return;
 
+    _wrapLog(
+      'playerState change: playing $_sessionLastAudioPlayerPlaying -> ${state.playing} '
+      'processing=${state.processingState} song=$_sessionSongId',
+    );
     if (state.playing) {
       resumeListeningSession(currentSong: currentSong);
     } else {
@@ -280,6 +342,11 @@ class ListeningStatsService {
   }) {
     if (_sessionSong == null) return;
 
+    _wrapLog(
+      'finishListeningSession: song=$_sessionSongId countCurrentTick=$countCurrentTick '
+      'wasPlaying=$wasPlaying flushStats=$flushStats '
+      'sessionListened=${_sessionListened.inSeconds}s qualified=$_sessionQualified',
+    );
     if (countCurrentTick) {
       recordListeningSessionProgress(
         wasPlaying: wasPlaying,
@@ -314,6 +381,9 @@ class ListeningStatsService {
 
     final song = currentSong;
     if (song != null) {
+      _wrapLog(
+        'startListeningSessionIfNeeded: starting for song=${song['ytid']}',
+      );
       startListeningSession(song);
     }
   }
@@ -347,12 +417,14 @@ class ListeningStatsService {
   }
 
   void reload() {
+    _wrapLog('reload: dropping in-memory stats cache');
     _dirty = false;
     _listeningTimeRemainder = Duration.zero;
     _stats = null;
   }
 
   Future<void> clearStats() async {
+    _wrapLog('clearStats: deleting all listening stats');
     _dirty = false;
     _listeningTimeRemainder = Duration.zero;
     final now = DateTime.now();
@@ -372,6 +444,7 @@ class ListeningStatsService {
   /// Writes pending stats to disk if anything changed since the last write.
   /// Called at playback checkpoints and when the app is backgrounded/closed.
   Future<void> flush() async {
+    _wrapLog('flush requested (dirty=$_dirty)');
     await _persist();
   }
 
@@ -381,7 +454,9 @@ class ListeningStatsService {
     if (cached != null) {
       final previousMonthKey = cached['currentMonthKey']?.toString();
       _stats = normalizeListeningStats(cached, currentDate);
-      if (previousMonthKey != _stats!['currentMonthKey']?.toString()) {
+      final newMonthKey = _stats!['currentMonthKey']?.toString();
+      if (previousMonthKey != newMonthKey) {
+        _wrapLog('month rollover: $previousMonthKey -> $newMonthKey');
         _markDirty();
       }
       return _stats!;
@@ -401,9 +476,15 @@ class ListeningStatsService {
 
   Future<void> _persist() async {
     final stats = _stats;
-    if (stats == null || !_dirty) return;
+    if (stats == null || !_dirty) {
+      _wrapLog(
+        'persist: nothing to write (hasStats=${stats != null} dirty=$_dirty)',
+      );
+      return;
+    }
     try {
       await addOrUpdateData('user', storageKey, stats);
+      _wrapLog('persist: wrote stats to Hive');
       // Clear the dirty flag only if no newer recording replaced _stats while
       // this write was in flight, otherwise those changes would be lost.
       if (identical(_stats, stats)) {

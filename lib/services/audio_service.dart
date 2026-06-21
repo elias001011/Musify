@@ -1583,6 +1583,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
           _lastError = e.toString();
         }),
       );
+      logger.log('[WrappedDbg] action: play() song=${currentSong?['ytid']}');
       listeningStatsService.resumeListeningSession(currentSong: currentSong);
     } catch (e, stackTrace) {
       logger.log('Error in play()', error: e, stackTrace: stackTrace);
@@ -1593,6 +1594,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   @override
   Future<void> pause() async {
     try {
+      logger.log('[WrappedDbg] action: pause()');
       listeningStatsService.recordListeningSessionProgress(
         wasPlaying: audioPlayer.playing,
       );
@@ -1612,6 +1614,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
     _lastError = null;
     _consecutiveErrors = 0;
     try {
+      logger.log('[WrappedDbg] action: stop()');
       listeningStatsService.finishListeningSession(
         countCurrentTick: true,
         wasPlaying: audioPlayer.playing,
@@ -1644,6 +1647,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
   @override
   Future<void> seek(Duration position) async {
     try {
+      logger.log('[WrappedDbg] action: seek(${position.inSeconds}s)');
       listeningStatsService.recordListeningSessionProgress(
         wasPlaying: audioPlayer.playing,
       );

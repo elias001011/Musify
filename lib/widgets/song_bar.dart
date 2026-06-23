@@ -458,14 +458,41 @@ class _SongBarState extends State<SongBar> {
         child: Stack(
           children: [
             Padding(
-              padding:
-                  widget.barPadding ??
-                  const EdgeInsetsDirectional.fromSTEB(
+              padding: () {
+                final basePadding = widget.barPadding;
+                if (basePadding is EdgeInsetsDirectional) {
+                  return EdgeInsetsDirectional.fromSTEB(
+                    basePadding.start,
+                    basePadding.top,
+                    basePadding.end + _menuHitAreaWidth,
+                    basePadding.bottom,
+                  );
+                } else if (basePadding is EdgeInsets) {
+                  final direction = Directionality.of(context);
+                  if (direction == TextDirection.rtl) {
+                    return EdgeInsets.fromLTRB(
+                      basePadding.left + _menuHitAreaWidth,
+                      basePadding.top,
+                      basePadding.right,
+                      basePadding.bottom,
+                    );
+                  } else {
+                    return EdgeInsets.fromLTRB(
+                      basePadding.left,
+                      basePadding.top,
+                      basePadding.right + _menuHitAreaWidth,
+                      basePadding.bottom,
+                    );
+                  }
+                } else {
+                  return const EdgeInsetsDirectional.fromSTEB(
                     12,
                     10,
                     _menuHitAreaWidth,
                     10,
-                  ),
+                  );
+                }
+              }(),
               child: Row(
                 children: [
                   if (widget.rank != null) ...[

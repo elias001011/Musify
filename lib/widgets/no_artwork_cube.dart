@@ -45,6 +45,10 @@ class NullArtworkWidget extends StatelessWidget {
 
     final badgeSize = size * 0.4;
     final calculatedIconSize = iconSize ?? (badgeSize * 0.5);
+    // Fluent's music-note glyph has slightly more visual weight below and to
+    // the right of its bounding box. Compensate for that optical offset so it
+    // appears centered in the circular placeholder badge.
+    final iconVisualOffset = calculatedIconSize * 0.04;
 
     return SizedBox(
       width: size,
@@ -65,10 +69,13 @@ class NullArtworkWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: colorScheme.primaryContainer.withValues(alpha: 0.55),
                 ),
-                child: Icon(
-                  icon,
-                  size: calculatedIconSize,
-                  color: colorScheme.onPrimaryContainer,
+                child: Transform.translate(
+                  offset: Offset(-iconVisualOffset, -iconVisualOffset),
+                  child: Icon(
+                    icon,
+                    size: calculatedIconSize,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
               if (title != null) ...[

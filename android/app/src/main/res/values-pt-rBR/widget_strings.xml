@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">Player do Musify</string>
+    <string name="widget_description">Retome e controle o Musify pela tela inicial</string>
+    <string name="widget_default_title">Musify</string>
+    <string name="widget_resume_hint">Toque em reproduzir para retomar</string>
+    <string name="widget_unknown_artist">Artista desconhecido</string>
+    <string name="widget_artwork">Capa do álbum</string>
+    <string name="widget_play">Reproduzir</string>
+    <string name="widget_pause">Pausar</string>
+    <string name="widget_previous">Anterior</string>
+    <string name="widget_next">Próxima</string>
+</resources>

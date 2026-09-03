@@ -1378,6 +1378,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
       ? _queueList[_currentQueueIndex]
       : null;
 
+  /// The same fallback used by Android Auto, media resumption and [play].
+  Map? get latestResumableSong => _latestResumableSong();
+
   bool get hasNext => _currentQueueIndex < _queueList.length - 1;
 
   bool get hasPrevious => _currentQueueIndex > 0 || _historyList.isNotEmpty;

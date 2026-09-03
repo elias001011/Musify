@@ -26,6 +26,7 @@ dependencies:
   go_router: ^18.0.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  home_widget: ^0.9.3
   html: ^0.15.6
   http: ^1.6.0
   intl: ^0.20.2

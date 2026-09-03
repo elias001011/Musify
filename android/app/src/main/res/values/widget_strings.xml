@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">Musify player</string>
+    <string name="widget_description">Resume and control Musify from your home screen</string>
+    <string name="widget_default_title">Musify</string>
+    <string name="widget_resume_hint">Tap play to resume</string>
+    <string name="widget_unknown_artist">Unknown artist</string>
+    <string name="widget_artwork">Album artwork</string>
+    <string name="widget_play">Play</string>
+    <string name="widget_pause">Pause</string>
+    <string name="widget_previous">Previous</string>
+    <string name="widget_next">Next</string>
+</resources>

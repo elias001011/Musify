@@ -84,8 +84,6 @@ class SettingsPage extends StatelessWidget {
     Color activatedColor,
     Color inactivatedColor,
   ) {
-    final isOffline = offlineMode.value;
-
     return Column(
       children: [
         SectionHeader(
@@ -191,12 +189,26 @@ class SettingsPage extends StatelessWidget {
               context.l10n!.offlineMode,
               FluentIcons.cloud_off_24_regular,
               description: context.l10n!.offlineModeDescription,
-              borderRadius: isOffline && isFdroidBuild
+              trailing: Switch(
+                value: value,
+                onChanged: (value) => _toggleOfflineMode(context, value),
+              ),
+            );
+          },
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: localFilesEnabled,
+          builder: (_, value, __) {
+            return CustomBar(
+              context.l10n!.localFiles,
+              FluentIcons.music_note_2_24_regular,
+              description: context.l10n!.localFilesDescription,
+              borderRadius: isFdroidBuild
                   ? commonCustomBarRadiusLast
                   : BorderRadius.zero,
               trailing: Switch(
                 value: value,
-                onChanged: (value) => _toggleOfflineMode(context, value),
+                onChanged: (value) => _toggleLocalFiles(context, value),
               ),
             );
           },
@@ -757,6 +769,12 @@ class SettingsPage extends StatelessWidget {
     // Trigger router refresh and notify about the change
     NavigationManager.refreshRouter();
 
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _toggleLocalFiles(BuildContext context, bool value) {
+    addOrUpdateData<bool>('settings', 'localFilesEnabled', value);
+    localFilesEnabled.value = value;
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

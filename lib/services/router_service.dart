@@ -31,6 +31,7 @@ import 'package:musify/screens/equalizer_page.dart';
 import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/import_spotify_playlist_page.dart';
 import 'package:musify/screens/library_page.dart';
+import 'package:musify/screens/local_files_page.dart';
 import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/radio_stations_page.dart';
@@ -252,6 +253,11 @@ class NavigationManager {
                 path: 'radioStations',
                 pageBuilder: (context, state) =>
                     _pushPage(child: const RadioStationsPage(), state: state),
+              ),
+              GoRoute(
+                path: 'localFiles',
+                pageBuilder: (context, state) =>
+                    _pushPage(child: const LocalFilesPage(), state: state),
               ),
             ],
           ),

@@ -53,13 +53,15 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   bool canRename = false,
   bool canRemove = false,
   bool showGoToArtist = false,
+  bool isLocalSong = false,
 }) {
   final l10n = context.l10n!;
   final playNextText = l10n.playNext;
   final addToQueueText = l10n.addToQueue;
   final removeFromLikedSongsText = l10n.removeFromLikedSongs;
   final addToLikedSongsText = l10n.addToLikedSongs;
-  final removeFromPlaylistText = l10n.removeFromPlaylist;
+  final removeFromPlaylistText =
+      isLocalSong ? l10n.removeLocalFile : l10n.removeFromPlaylist;
   final addToPlaylistText = l10n.addToPlaylist;
   final removeFromRecentlyPlayedText = l10n.removeFromRecentlyPlayed;
   final removeOfflineText = l10n.removeOffline;
@@ -88,7 +90,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: addToQueueText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value)
+    if (!offlineMode.value && !isLocalSong)
       PopupMenuItem<String>(
         value: 'like',
         child: ValueListenableBuilder<bool>(
@@ -124,7 +126,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: removeFromPlaylistText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value)
+    if (!offlineMode.value && !isLocalSong)
       buildPopupMenuItem<String>(
         value: 'add_to_playlist',
         icon: FluentIcons.album_add_24_regular,
@@ -138,7 +140,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: removeFromRecentlyPlayedText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value || songOfflineStatus.value)
+    if (!isLocalSong && (!offlineMode.value || songOfflineStatus.value))
       PopupMenuItem<String>(
         value: 'offline',
         child: ValueListenableBuilder<bool>(
@@ -639,7 +641,8 @@ class _SongBarState extends State<SongBar> {
       isRecentSong: widget.isRecentSong == true,
       canRename: canRename,
       canRemove: widget.onRemove != null,
-      showGoToArtist: _songArtist.isNotEmpty,
+      showGoToArtist: _songArtist.isNotEmpty && widget.song['isLocal'] != true,
+      isLocalSong: widget.song['isLocal'] == true,
     );
   }
 }
@@ -731,11 +734,13 @@ class _OfflineArtwork extends StatelessWidget {
     required this.artworkPath,
     required this.size,
     required this.colorScheme,
+    this.isLocal = false,
   });
 
   final String artworkPath;
   final double size;
   final ColorScheme colorScheme;
+  final bool isLocal;
 
   @override
   Widget build(BuildContext context) {
@@ -765,7 +770,9 @@ class _OfflineArtwork extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  FluentIcons.cloud_off_24_filled,
+                  isLocal
+                      ? FluentIcons.music_note_2_24_filled
+                      : FluentIcons.cloud_off_24_filled,
                   size: 11,
                   color: colorScheme.onTertiaryContainer,
                 ),
@@ -923,12 +930,17 @@ class _ArtworkDisplay extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: offlineStatus,
       builder: (_, isOffline, __) {
-        if (isOffline && artworkPath != null) {
+        if (artworkPath != null) {
           return _OfflineArtwork(
             artworkPath: artworkPath!,
             size: size,
             colorScheme: colorScheme,
+            isLocal: !isOffline,
           );
+        }
+
+        if (lowResImageUrl.isEmpty) {
+          return NullArtworkWidget(iconSize: 30, size: size);
         }
 
         return ValueListenableBuilder<bool>(

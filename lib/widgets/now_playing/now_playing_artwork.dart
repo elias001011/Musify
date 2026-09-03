@@ -249,7 +249,10 @@ class _AudioQualityBadgeState extends State<_AudioQualityBadge> {
     _resolvedYtid = ytid;
 
     final shouldResolve =
-        showAudioQualityBadge.value && ytid != null && ytid.isNotEmpty;
+        showAudioQualityBadge.value &&
+        widget.metadata.extras?['isLocal'] != true &&
+        ytid != null &&
+        ytid.isNotEmpty;
     _infoFuture = shouldResolve ? _resolveAudioQuality(ytid) : null;
   }
 

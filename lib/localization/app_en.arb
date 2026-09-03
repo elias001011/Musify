@@ -162,6 +162,24 @@
   "languageZh": "Chinese (Simplified)",
   "languageZhHant": "Chinese (Traditional)",
   "library": "Library",
+  "localFiles": "Local files",
+  "localFilesDescription": "Show music imported from this device in your library. Files are selected with the system picker and copied into Musify's private storage.",
+  "importLocalFiles": "Import music",
+  "localFilesImported": "{count, plural, =1{1 local file imported} other{{count} local files imported}}",
+  "@localFilesImported": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "localFilesAlreadyImported": "The selected files are already in your library",
+  "localFilesImportFailed": "No supported audio files could be imported",
+  "noLocalFiles": "No local music yet",
+  "noLocalFilesDescription": "Import MP3, M4A, FLAC, OGG, Opus, WAV, AAC, AIFF, APE, or MP4 audio files from your device.",
+  "noLocalFilesFound": "No local music matches your search",
+  "refreshLocalFiles": "Refresh local library",
+  "removeLocalFile": "Remove local file",
+  "removeLocalFileQuestion": "Remove this imported copy from Musify? The original file on your device will not be changed.",
+  "searchLocalFiles": "Search local music",
   "licenses": "Licenses",
   "likedPlaylists": "Liked playlists",
   "likedSongs": "Liked songs",

@@ -736,7 +736,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
           }
 
           final baseSong = _getCurrentSongForRecommendations();
-          if (baseSong == null) {
+          if (baseSong == null || baseSong['isLocal'] == true) {
             return;
           }
 
@@ -1296,6 +1296,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
             final ytid = nextSong['ytid'];
 
             if (ytid != null &&
+                nextSong['isLocal'] != true &&
                 !isSongAlreadyOffline(ytid) &&
                 !_preloadedYtIds.contains(ytid) &&
                 !_preloadingYtIds.contains(ytid)) {
@@ -1894,6 +1895,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
 
   Future<_PlaybackSource?> _resolvePlaybackSource(Map songData) async {
     final isOffline = await _resolveOfflineAndSetPaths(songData);
+    if (songData['isLocal'] == true && !isOffline) {
+      logger.log('Imported local audio file is missing: ${songData['ytid']}');
+      return null;
+    }
     if (!isOffline && offlineMode.value) {
       logger.log(
         'Offline mode enabled and no local file found for ${songData['ytid']}',
@@ -2056,6 +2061,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
       );
 
       if (isOffline) {
+        if (song['isLocal'] == true) return false;
         // If offline mode is explicitly enabled, do not attempt any online
         // fallback — respect the user's offline-only preference.
         try {
@@ -2255,7 +2261,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
       if (isOffline) {
         final fileSource = AudioSource.file(songUrl, tag: tag);
 
-        if (sponsorBlockSupport.value) {
+        if (sponsorBlockSupport.value && song['isLocal'] != true) {
           return _applyOfflineSponsorBlock(fileSource, song['ytid']) ??
               fileSource;
         }

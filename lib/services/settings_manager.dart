@@ -48,6 +48,10 @@ final offlineMode = ValueNotifier<bool>(
   Hive.box('settings').get('offlineMode', defaultValue: false),
 );
 
+final localFilesEnabled = ValueNotifier<bool>(
+  Hive.box('settings').get('localFilesEnabled', defaultValue: false),
+);
+
 final wrappedEnabled = ValueNotifier<bool>(
   Hive.box('settings').get('wrappedEnabled', defaultValue: true),
 );
@@ -140,6 +144,10 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   offlineMode.value = settings.get('offlineMode', defaultValue: false);
+  localFilesEnabled.value = settings.get(
+    'localFilesEnabled',
+    defaultValue: false,
+  );
   wrappedEnabled.value = settings.get('wrappedEnabled', defaultValue: true);
   sponsorBlockSupport.value = settings.get(
     'sponsorBlockSupport',

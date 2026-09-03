@@ -27,6 +27,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -51,6 +52,22 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   @override
+  void initState() {
+    super.initState();
+    localFilesEnabled.addListener(_refreshLocalFilesVisibility);
+  }
+
+  void _refreshLocalFilesVisibility() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    localFilesEnabled.removeListener(_refreshLocalFilesVisibility);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Show offline mode message if there is no content
     if (offlineMode.value) {
@@ -64,11 +81,13 @@ class _LibraryPageState extends State<LibraryPage> {
         offlineOnly: true,
       ).isNotEmpty;
       final hasOfflineSongs = userOfflineSongs.value.isNotEmpty;
+      final hasLocalFilesLibrary = localFilesEnabled.value;
 
       if (!hasUserContent &&
           !hasOfflinePlaylists &&
           !hasOfflineArtists &&
-          !hasOfflineSongs) {
+          !hasOfflineSongs &&
+          !hasLocalFilesLibrary) {
         final colorScheme = Theme.of(context).colorScheme;
         return Scaffold(
           appBar: AppBar(title: Text(context.l10n!.library)),
@@ -128,6 +147,8 @@ class _LibraryPageState extends State<LibraryPage> {
           onlinePlaylists,
           userPlaylists,
           userOfflineSongs,
+          localFilesEnabled,
+          localFilesService.songs,
         ]),
         builder: (context, _) {
           return Padding(
@@ -205,7 +226,9 @@ class _LibraryPageState extends State<LibraryPage> {
 
     final hasFolders = folders.isNotEmpty;
     final hasCustomPlaylists = playlistsNotInFolders.isNotEmpty;
-    final hasLibraryContent = !isOffline || hasFolders || hasCustomPlaylists;
+    final showLocalFiles = localFilesEnabled.value;
+    final hasLibraryContent =
+        !isOffline || hasFolders || hasCustomPlaylists || showLocalFiles;
 
     final slivers = <Widget>[];
 
@@ -270,12 +293,24 @@ class _LibraryPageState extends State<LibraryPage> {
                   onPressed: () =>
                       NavigationManager.router.go('/library/radioStations'),
                   cubeIcon: FluentIcons.sound_source_24_regular,
-                  borderRadius: hasCustomPlaylists || hasFolders
+                  borderRadius:
+                      hasCustomPlaylists || hasFolders || showLocalFiles
                       ? BorderRadius.zero
                       : commonCustomBarRadiusLast,
                   showBuildActions: false,
                 ),
               ],
+              if (showLocalFiles)
+                PlaylistBar(
+                  context.l10n!.localFiles,
+                  onPressed: () =>
+                      NavigationManager.router.go('/library/localFiles'),
+                  cubeIcon: FluentIcons.music_note_2_24_regular,
+                  borderRadius: hasCustomPlaylists || hasFolders
+                      ? BorderRadius.zero
+                      : commonCustomBarRadiusLast,
+                  showBuildActions: false,
+                ),
             ],
           ),
         ),

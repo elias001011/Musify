@@ -504,9 +504,15 @@ class SettingsPage extends StatelessWidget {
           icon: FluentIcons.more_circle_24_filled,
         ),
         CustomBar(
+          context.l10n!.playlistAlarms,
+          FluentIcons.clock_alarm_24_regular,
+          description: context.l10n!.playlistAlarmDescription,
+          borderRadius: commonCustomBarRadiusFirst,
+          onTap: () => NavigationManager.router.go('/settings/playlist-alarms'),
+        ),
+        CustomBar(
           context.l10n!.licenses,
           FluentIcons.document_24_regular,
-          borderRadius: commonCustomBarRadiusFirst,
           onTap: () => NavigationManager.router.go('/settings/license'),
         ),
         CustomBar(

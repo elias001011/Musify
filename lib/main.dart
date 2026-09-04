@@ -36,6 +36,7 @@ import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/logger_service.dart';
+import 'package:musify/services/playlist_alarm_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -294,6 +295,7 @@ Future<void> initialisation() async {
         androidStopForegroundOnPause: false,
       ),
     );
+    await PlaylistAlarmService.instance.initialize(audioHandler);
 
     // Init router
     NavigationManager.instance;

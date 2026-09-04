@@ -1073,7 +1073,7 @@ Future<Map?> getPlaylistInfoForWidget(
     return getArtistAlbum(normalizedId, forceRefresh: forceRefresh);
   }
 
-  return _fetchYouTubePlaylist(normalizedId);
+  return _fetchYouTubePlaylist(normalizedId, forceRefresh: forceRefresh);
 }
 
 Future<Map<String, dynamic>?> resolveArtistInfoForWidget(
@@ -1148,7 +1148,10 @@ Map? _findPlaylistById(Iterable<dynamic> playlists, String id) {
   return null;
 }
 
-Future<Map?> _fetchYouTubePlaylist(String id) async {
+Future<Map?> _fetchYouTubePlaylist(
+  String id, {
+  bool forceRefresh = false,
+}) async {
   // 1. Local DB / in-memory caches (no network).
   var playlist = _findPlaylistById(playlists, id);
 
@@ -1185,14 +1188,23 @@ Future<Map?> _fetchYouTubePlaylist(String id) async {
 
   // 5. Populate the song list if it is absent or empty.
   final list = playlist['list'];
-  if (list == null || (list is List && list.isEmpty)) {
-    playlist['list'] = await _loadSongsForPlaylist(playlist);
+  if (forceRefresh || list == null || (list is List && list.isEmpty)) {
+    playlist['list'] = await _loadSongsForPlaylist(
+      playlist,
+      forceRefresh: forceRefresh,
+    );
   }
 
   return playlist;
 }
 
-Future<List> _loadSongsForPlaylist(Map playlist) async {
+Future<List> _loadSongsForPlaylist(
+  Map playlist, {
+  bool forceRefresh = false,
+}) async {
+  final existingSongs = List<dynamic>.from(
+    playlist['list'] as List? ?? const <dynamic>[],
+  );
   try {
     final playlistImage = playlist['isAlbum'] == true
         ? playlist['image'] as String?
@@ -1200,6 +1212,7 @@ Future<List> _loadSongsForPlaylist(Map playlist) async {
     final songs = await getSongsFromPlaylist(
       playlist['ytid'],
       playlistImage: playlistImage,
+      forceRefresh: forceRefresh,
     );
     if (!playlists.contains(playlist)) {
       playlists.add(playlist);
@@ -1211,22 +1224,37 @@ Future<List> _loadSongsForPlaylist(Map playlist) async {
       error: e,
       stackTrace: stackTrace,
     );
-    return [];
+    return existingSongs;
   }
 }
 
 Future<List> getSongsFromPlaylist(
   dynamic playlistId, {
   String? playlistImage,
+  bool forceRefresh = false,
 }) async {
   final songList = await getData('cache', 'playlistSongs$playlistId') ?? [];
 
-  if (songList.isEmpty) {
-    await for (final song in ytClient.playlists.getVideos(playlistId)) {
-      songList.add(
-        returnSongLayout(songList.length, song, playlistImage: playlistImage),
-      );
+  if (forceRefresh || songList.isEmpty) {
+    final refreshedSongs = <dynamic>[];
+    try {
+      await for (final song in ytClient.playlists.getVideos(playlistId)) {
+        refreshedSongs.add(
+          returnSongLayout(
+            refreshedSongs.length,
+            song,
+            playlistImage: playlistImage,
+          ),
+        );
+      }
+    } catch (_) {
+      if (songList.isNotEmpty) return songList;
+      rethrow;
     }
+
+    songList
+      ..clear()
+      ..addAll(refreshedSongs);
 
     unawaited(
       addOrUpdateData<List>('cache', 'playlistSongs$playlistId', songList),

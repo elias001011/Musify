@@ -32,6 +32,7 @@ import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/lyrics_manager.dart';
+import 'package:musify/services/playback_diagnostics.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -104,7 +105,12 @@ Future<StreamManifest?> _fetchStreamManifest(String songId) async {
     return ProxyManager().getSongManifest(songId).timeout(_manifestTimeout);
   }
 
-  return getManifestWithFallback(ytClient, songId, timeout: _manifestTimeout);
+  return getManifestWithFallback(
+    ytClient,
+    songId,
+    timeout: _manifestTimeout,
+    log: logger.log,
+  );
 }
 
 /// Returns a cached song URL if present and still valid.
@@ -676,6 +682,22 @@ void _cacheSelectedAudioStream(String songId, AudioOnlyStreamInfo stream) {
   );
 }
 
+// Short description of the manifest and stream last resolved for each song,
+// kept only so a playback failure can say what it was trying to play.
+final Map<String, String> _resolvedStreamSummaries = {};
+
+/// What was resolved for [songId] (manifest size, chosen stream, URL type), or
+/// null when the URL came from the cache and nothing was resolved this run.
+String? describeResolvedSongStream(String songId) =>
+    _resolvedStreamSummaries[songId];
+
+void _rememberResolvedStream(String songId, String summary) {
+  if (_resolvedStreamSummaries.length >= _maxSelectedAudioStreams) {
+    _resolvedStreamSummaries.remove(_resolvedStreamSummaries.keys.first);
+  }
+  _resolvedStreamSummaries[songId] = summary;
+}
+
 /// Drops both cached forms of a song's stream, so the next request resolves
 /// it again. Used when a cached URL turns out to be dead.
 Future<void> invalidateSongStreamCache(String songId) async {
@@ -710,6 +732,12 @@ Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
     }
 
     _cacheSelectedAudioStream(songId, selectedStream);
+    final summary =
+        'manifest {${describeManifest(manifest!)}}; chosen '
+        '${describeAudioStream(selectedStream)} '
+        '(quality=${audioQualitySetting.value})';
+    _rememberResolvedStream(songId, summary);
+    logger.log('fetchBestAudioStream: $songId resolved $summary');
     return selectedStream;
   } on TimeoutException catch (_) {
     logger.log('fetchBestAudioStream request timed out for $songId');
@@ -743,6 +771,10 @@ Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
     // Try to get from cache
     final cachedUrl = await _getCachedSongUrl(songId, cacheKey, _cacheDuration);
     if (cachedUrl != null) {
+      logger.log(
+        'fetchSongStreamUrl: $songId using cached URL '
+        '${describeStreamUrl(cachedUrl)}',
+      );
       return cachedUrl;
     }
 

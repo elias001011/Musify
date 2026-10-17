@@ -301,9 +301,17 @@ class ProxyManager {
         _defaultYt,
         songId,
         timeout: Duration(seconds: timeoutSeconds),
+        log: logger.log,
       );
       return manifest;
     } catch (e) {
+      // Each client's own failure (with its stack trace) was logged by
+      // getManifestWithFallback; this line records that the direct route as a
+      // whole failed, so the log no longer jumps straight to public proxies.
+      logger.log(
+        'ProxyManager: direct manifest request failed for $songId '
+        '(timeout ${timeoutSeconds}s per client, ${e.runtimeType})',
+      );
       return null;
     }
   }

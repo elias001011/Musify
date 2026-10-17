@@ -2085,15 +2085,19 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         stackTrace: stackTrace,
       );
 
+      _logSourceFailureDetails(
+        song,
+        audioSource,
+        e,
+        isOffline: isOffline,
+        isRetry: !allowOnlineRetry,
+      );
+
       if (kDebugMode && !isOffline && allowOnlineRetry) {
-        unawaited(
-          diagnosePlaybackSource(
-            song['ytid']?.toString() ?? '',
-            songUrl,
-            streamPlaybackHeaders(song['ytid']?.toString()),
-            logger.log,
-          ),
-        );
+        final songId = song['ytid']?.toString() ?? '';
+        final headers = streamPlaybackHeaders(songId);
+        unawaited(diagnosePlaybackSource(songId, songUrl, headers, logger.log));
+        unawaited(_runExtraPlaybackProbes(songId, songUrl, headers));
       }
 
       if (isOffline) {
@@ -2129,6 +2133,66 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
       _lastError = e.toString();
       return false;
+    }
+  }
+
+  static var _userAgentProbes = 0;
+  static var _nativeProbes = 0;
+  static var _loopbackProbeStarted = false;
+
+  /// One structured line describing a failed attempt to load a source: what
+  /// kind of source, how it reached the player, what was resolved for it and
+  /// what the player reported. Contains no signed URL parameters or cookies.
+  void _logSourceFailureDetails(
+    Map song,
+    AudioSource audioSource,
+    Object error, {
+    required bool isOffline,
+    required bool isRetry,
+  }) {
+    try {
+      final songId = song['ytid']?.toString() ?? '';
+      logger.log(
+        'Playback source failure for $songId: '
+        'error={${describePlayerError(error)}} '
+        'source={${describeAudioSource(audioSource)}} '
+        'resolved={${isOffline ? 'offline file' : describeResolvedSongStream(songId) ?? 'URL came from cache, no manifest resolved this run'}} '
+        'offline=$isOffline retryWithFreshUrl=$isRetry '
+        'player={processingState=${audioPlayer.processingState.name} '
+        'playing=${audioPlayer.playing}} '
+        'platform={${Platform.operatingSystem} ${Platform.operatingSystemVersion}}. '
+        'The native ExoPlayer cause is only in logcat (tag AudioPlayer, '
+        '"TYPE_SOURCE").',
+      );
+    } catch (e) {
+      logger.log('Could not describe the source failure: ${e.runtimeType}');
+    }
+  }
+
+  /// Debug-build probes that explain a source failure: whether the CDN cares
+  /// about the User-Agent just_audio's proxy sends, whether a throwaway player
+  /// can load the URL with and without the proxy, and whether ExoPlayer can
+  /// reach the proxy's loopback address at all. Nothing is played.
+  Future<void> _runExtraPlaybackProbes(
+    String songId,
+    String songUrl,
+    Map<String, String> headers,
+  ) async {
+    try {
+      if (_userAgentProbes < 3) {
+        _userAgentProbes++;
+        await diagnoseUserAgentVariants(songId, songUrl, headers, logger.log);
+      }
+      if (_nativeProbes < 2) {
+        _nativeProbes++;
+        await diagnoseNativePlayback(songId, songUrl, headers, logger.log);
+      }
+      if (!_loopbackProbeStarted) {
+        _loopbackProbeStarted = true;
+        await diagnoseLoopbackCleartext(logger.log);
+      }
+    } catch (e) {
+      logger.log('Playback probes failed: ${e.runtimeType}');
     }
   }
 

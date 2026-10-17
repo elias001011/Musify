@@ -24,6 +24,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:musify/constants/clients.dart';
@@ -33,6 +34,7 @@ import 'package:musify/services/audio_service_android_auto.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/playback_diagnostics.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/media_duration.dart';
@@ -2082,6 +2084,17 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         error: e,
         stackTrace: stackTrace,
       );
+
+      if (kDebugMode && !isOffline && allowOnlineRetry) {
+        unawaited(
+          diagnosePlaybackSource(
+            song['ytid']?.toString() ?? '',
+            songUrl,
+            streamPlaybackHeaders(song['ytid']?.toString()),
+            logger.log,
+          ),
+        );
+      }
 
       if (isOffline) {
         // If offline mode is explicitly enabled, do not attempt any online

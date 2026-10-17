@@ -1,43 +1,89 @@
+name: Build debug APK and fork pre-release
 on: workflow_dispatch
-name: Build debug apk
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Build APK
+    name: Test and build debug APK
     runs-on: ubuntu-latest
-
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
-      # Setup Java environment in order to build the Android app.
       - uses: actions/setup-java@v5
         with:
-          distribution: 'zulu'
-          java-version: '17.x'
+          distribution: zulu
+          java-version: '17'
 
-      # Gradle cache for faster builds
       - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      # Setup the flutter environment.
+          key: ${{ runner.os }}-gradle-debug-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-debug-
+
+      - name: Read required Flutter version
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          version = re.search(r'^  flutter: \^([\d.]+)$', Path('pubspec.yaml').read_text(), re.M).group(1)
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'FLUTTER_VERSION={version}\n')
+          PY
+
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-      # Get flutter dependencies.
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
       - run: flutter pub get
-      # # Check for any formatting issues in the code.
-      # - run: dart format --set-exit-if-changed .
-      # Statically analyze the Dart code for any errors.
-      - run: flutter analyze .
-      # Build universal apk.
-      - run: flutter build apk --debug --flavor github
-      # Upload universal generated apk to the artifacts.
-      - uses: actions/upload-artifact@v3
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub
+
+      - name: Build universal debug APK
+        run: flutter build apk --debug --flavor github --no-pub
+
+      - name: Prepare APK and checksum
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-github-debug.apk dist/Musify-youtube-debug.apk
+          cd dist
+          sha256sum Musify-youtube-debug.apk > SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: Musify-debug.apk
-          path: build/app/outputs/flutter-apk/app-github-debug.apk
+          name: Musify-youtube-debug
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish pre-release in this fork
+        if: github.repository == 'elias001011/Musify'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="master-puro-debug-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cat > release-notes.md <<EOF
+          Controle: upstream master puro, sem nenhuma alteração de código.
+
+          Base: upstream master 6cd66ec4 (inclui 9ddeeb11, cleartext traffic).
+          Commit: ${GITHUB_SHA}
+          Só o workflow de build difere do master. Não inclui a correção de datas
+          (Streamed 3y ago) nem logs extras de diagnóstico.
+
+          Serve para testar se a reprodução volta só com o master.
+          Instala como app separado: com.gokadzev.musify.debug.
+          EOF
+          gh release create "$tag" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Musify 10.5.3 — YouTube debug" \
+            --notes-file release-notes.md \
+            --prerelease --latest=false

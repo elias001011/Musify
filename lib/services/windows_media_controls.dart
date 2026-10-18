@@ -1,0 +1,126 @@
+import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:musify/services/desktop_media_artwork.dart';
+
+/// Connects Windows SMTC to the existing audio handler.
+class WindowsMediaControls {
+  WindowsMediaControls({
+    required this.onError,
+    this.resolveArtwork,
+    this.channel = const MethodChannel('musify/media_controls'),
+  });
+
+  final void Function(Object error, StackTrace stackTrace) onError;
+  final MethodChannel channel;
+  final MediaArtworkResolver? resolveArtwork;
+  late final _artwork = MediaArtworkState(
+    resolve: resolveArtwork,
+    onChanged: _scheduleUpdate,
+    onError: onError,
+  );
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  AudioHandler? _handler;
+  MediaItem? _item;
+  PlaybackState _state = PlaybackState();
+  Map<String, Object?>? _lastUpdate;
+  Future<void> _pending = Future.value();
+  bool _disposed = false;
+
+  Future<void> start(AudioHandler handler) async {
+    _handler = handler;
+    channel.setMethodCallHandler(_onMethodCall);
+    try {
+      await channel.invokeMethod<void>('initialize');
+    } catch (_) {
+      channel.setMethodCallHandler(null);
+      rethrow;
+    }
+    _subscriptions.addAll([
+      handler.mediaItem.listen((item) {
+        _item = item;
+        _artwork.update(item?.artUri);
+        _scheduleUpdate();
+      }),
+      handler.playbackState.listen((state) {
+        _state = state;
+        _scheduleUpdate();
+      }),
+    ]);
+  }
+
+  bool get _active =>
+      _item != null &&
+      _state.processingState != AudioProcessingState.idle &&
+      _state.processingState != AudioProcessingState.completed &&
+      _state.processingState != AudioProcessingState.error;
+
+  void _scheduleUpdate() {
+    // Serialize updates so Windows receives the latest track metadata.
+    _pending = _pending
+        .then((_) async {
+          if (_disposed) return;
+          final artUri = _artwork.uri;
+          final update = <String, Object?>{
+            'enabled': _active,
+            'status': !_active
+                ? 'stopped'
+                : _state.playing
+                ? 'playing'
+                : 'paused',
+            'title': _item?.title ?? '',
+            'artist': _item?.artist ?? '',
+            'album': _item?.album ?? '',
+            'artUri': artUri?.scheme == 'http' || artUri?.scheme == 'https'
+                ? artUri.toString()
+                : '',
+            'artPath': artUri?.scheme == 'file'
+                ? artUri!.toFilePath(windows: true)
+                : '',
+          };
+          // Playback progress ticks do not need to refresh the Windows media card.
+          if (mapEquals(update, _lastUpdate)) return;
+          await channel.invokeMethod<void>('update', update);
+          _lastUpdate = update;
+        })
+        .catchError(onError);
+  }
+
+  Future<void> _onMethodCall(MethodCall call) async {
+    if (_disposed || !_active || call.method != 'button') return;
+    try {
+      switch (call.arguments) {
+        case 'play':
+          await _handler!.play();
+        case 'pause':
+          await _handler!.pause();
+        case 'next':
+          await _handler!.skipToNext();
+        case 'previous':
+          await _handler!.skipToPrevious();
+        case 'stop':
+          await _handler!.stop();
+      }
+    } catch (error, stackTrace) {
+      onError(error, stackTrace);
+    }
+  }
+
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    _artwork.dispose();
+    channel.setMethodCallHandler(null);
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+    await _pending;
+    try {
+      await channel.invokeMethod<void>('dispose');
+    } catch (error, stackTrace) {
+      onError(error, stackTrace);
+    }
+  }
+}

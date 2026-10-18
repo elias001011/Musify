@@ -50,6 +50,12 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Test vendored YouTube parser regressions
+        working-directory: packages/youtube_explode_dart
+        run: |
+          dart pub get
+          dart analyze lib/src/extensions/helpers_extension.dart lib/src/reverse_engineering/clients/related_videos_client.dart test/relative_date_test.dart
+          dart test test/relative_date_test.dart
       - run: flutter build ${{ matrix.platform }} --release
       - name: Test native playback
         shell: bash

@@ -15,10 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest, platform: linux, source: fix/linux-native-media-controls, layer: linux}
-          - {os: windows-latest, platform: windows, source: fix/windows-native-media-controls, layer: windows}
-          - {os: ubuntu-latest, platform: linux, source: feat/desktop-volume-control, layer: volume}
-          - {os: windows-latest, platform: windows, source: feat/desktop-volume-control, layer: volume}
+          - {os: ubuntu-latest, platform: linux, source: cf80e68b, layer: volume}
+          - {os: windows-latest, platform: windows, source: cf80e68b, layer: volume}
           - {os: ubuntu-latest, platform: linux, source: validation/desktop-review-fixes-v2, layer: combined}
           - {os: windows-latest, platform: windows, source: validation/desktop-review-fixes-v2, layer: combined}
     runs-on: ${{ matrix.os }}

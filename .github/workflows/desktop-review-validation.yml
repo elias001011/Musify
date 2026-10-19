@@ -15,10 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "0e66f172b2c1b3d7bbefc3028a54bc1dd2897f48", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "0e66f172b2c1b3d7bbefc3028a54bc1dd2897f48", "layer": "combined"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "6669904551184f1887314d8298589f2b634c23db", "layer": "port"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "6669904551184f1887314d8298589f2b634c23db", "layer": "port"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "3a9d70fe5192e77eca196f84efc41bfd48dbc8b2", "layer": "combined"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "3a9d70fe5192e77eca196f84efc41bfd48dbc8b2", "layer": "combined"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -38,7 +36,8 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      - run: flutter pub get
+          cache: true
+      - run: flutter pub get --enforce-lockfile
       - run: flutter analyze
       - run: flutter test
       - name: Test vendored YouTube parser regressions

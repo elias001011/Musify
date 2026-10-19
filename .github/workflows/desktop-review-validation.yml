@@ -1,0 +1,95 @@
+name: Validate desktop review fixes
+
+on:
+  push:
+    branches:
+      - validation/desktop-review-fixes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, platform: linux, source: fix/linux-native-media-controls, layer: linux}
+          - {os: windows-latest, platform: windows, source: fix/windows-native-media-controls, layer: windows}
+          - {os: ubuntu-latest, platform: linux, source: feat/desktop-volume-control, layer: volume}
+          - {os: windows-latest, platform: windows, source: feat/desktop-volume-control, layer: volume}
+          - {os: ubuntu-latest, platform: linux, source: validation/desktop-review-fixes, layer: combined}
+          - {os: windows-latest, platform: windows, source: validation/desktop-review-fixes, layer: combined}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.source }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libmpv-dev pulseaudio xvfb desktop-file-utils
+      - name: Resolve Flutter version
+        shell: bash
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Test vendored YouTube parser regressions
+        working-directory: packages/youtube_explode_dart
+        run: |
+          dart pub get
+          dart analyze lib/src/extensions/helpers_extension.dart lib/src/reverse_engineering/clients/related_videos_client.dart test/relative_date_test.dart
+          dart test test/relative_date_test.dart
+      - name: Test Windows Runtime initialization
+        if: runner.os == 'Windows' && hashFiles('test/windows_runtime/CMakeLists.txt') != ''
+        run: |
+          cmake -S test/windows_runtime -B build/windows-runtime-test -A x64
+          cmake --build build/windows-runtime-test --config Release
+          ctest --test-dir build/windows-runtime-test -C Release --output-on-failure
+      - run: flutter build ${{ matrix.platform }} --release
+      - name: Test native playback
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            pulseaudio --start --exit-idle-time=-1
+            pactl load-module module-null-sink sink_name=musify-test
+            export MUSIFY_TEST_LIBMPV=/usr/lib/x86_64-linux-gnu/libmpv.so.2
+          else
+            export MUSIFY_TEST_LIBMPV="$(pwd)/build/windows/x64/runner/Release/libmpv-2.dll"
+          fi
+          flutter test test/desktop_audio_native_test.dart
+      - name: Check Linux startup
+        if: runner.os == 'Linux'
+        run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/musify
+      - name: Check Windows startup
+        if: runner.os == 'Windows'
+        run: python .github/scripts/check_desktop_startup.py build/windows/x64/runner/Release/musify.exe
+      - name: Check Windows icons
+        if: runner.os == 'Windows'
+        run: python .github/scripts/check_windows_icons.py build/windows/x64/runner/Release/musify.exe
+      - name: Validate Linux package integration
+        if: runner.os == 'Linux' && hashFiles('.github/scripts/package_linux_desktop.sh') != ''
+        run: |
+          bash .github/scripts/package_linux_desktop.sh
+          dpkg-deb -x build/desktop-artifacts/Musify-linux-x64.deb build/package-check
+          desktop-file-validate build/package-check/usr/share/applications/musify.desktop
+          cmp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png build/package-check/usr/share/icons/hicolor/192x192/apps/musify.png
+      - name: Archive Linux bundle
+        if: runner.os == 'Linux'
+        run: tar -czf build/musify-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musify-${{ matrix.layer }}-layer-${{ matrix.platform }}-x64
+          path: |
+            build/musify-linux-x64.tar.gz
+            build/desktop-artifacts/Musify-linux-x64.deb
+            build/windows/x64/runner/Release/
+          if-no-files-found: error

@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest, platform: linux, source: cf80e68b, layer: volume}
-          - {os: windows-latest, platform: windows, source: cf80e68b, layer: volume}
-          - {os: ubuntu-latest, platform: linux, source: validation/desktop-review-fixes-v2, layer: combined}
-          - {os: windows-latest, platform: windows, source: validation/desktop-review-fixes-v2, layer: combined}
+          - {os: ubuntu-latest, platform: linux, source: cf80e68bcd36042fbf1c35c055380cee508cd30a, layer: volume}
+          - {os: windows-latest, platform: windows, source: cf80e68bcd36042fbf1c35c055380cee508cd30a, layer: volume}
+          - {os: ubuntu-latest, platform: linux, source: 4d757980cad7684f75dcafac0c7122f0e185df59, layer: combined}
+          - {os: windows-latest, platform: windows, source: 4d757980cad7684f75dcafac0c7122f0e185df59, layer: combined}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5

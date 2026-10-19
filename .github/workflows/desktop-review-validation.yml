@@ -15,14 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "77d22deb7bcd7446208090ff30e7219221298a80", "layer": "linux"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "8f9af01b0228b7121717caea45cbf658024f5e9b", "layer": "windows"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "359e33ce26cc1346ad90f3828ab78c3a45cdc00c", "layer": "volume"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "359e33ce26cc1346ad90f3828ab78c3a45cdc00c", "layer": "volume"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "0bfc0a250049459cca43922fabc09cec81b4a21d", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "0bfc0a250049459cca43922fabc09cec81b4a21d", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "e27649cb8ee32486306ec530cbbe348853173ea2", "layer": "port"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "fea7d587f9cba76c4013a9cda84036496a79950c", "layer": "debian"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "0e66f172b2c1b3d7bbefc3028a54bc1dd2897f48", "layer": "combined"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "0e66f172b2c1b3d7bbefc3028a54bc1dd2897f48", "layer": "combined"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "6669904551184f1887314d8298589f2b634c23db", "layer": "port"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "6669904551184f1887314d8298589f2b634c23db", "layer": "port"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5

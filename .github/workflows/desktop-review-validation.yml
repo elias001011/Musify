@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "2e12e3ca4bec8b675c2f6a82304dec70179891f4", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "2e12e3ca4bec8b675c2f6a82304dec70179891f4", "layer": "combined"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "23ca6939e18390c1205d4db864be92cedbfe0159", "layer": "port"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "23ca6939e18390c1205d4db864be92cedbfe0159", "layer": "port"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "74413f5b3db7f5e3bfeb8403165e405c22ed5431", "layer": "combined"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "74413f5b3db7f5e3bfeb8403165e405c22ed5431", "layer": "combined"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "d41802c7114c3af78d0c2dac4dbd4b50cf3e2b8d", "layer": "port"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "d41802c7114c3af78d0c2dac4dbd4b50cf3e2b8d", "layer": "port"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -49,9 +49,9 @@ jobs:
           dart analyze lib/src/extensions/helpers_extension.dart lib/src/reverse_engineering/clients/related_videos_client.dart test/relative_date_test.dart
           dart test test/relative_date_test.dart
       - name: Test Windows Runtime initialization
-        if: runner.os == 'Windows' && hashFiles('test/windows_runtime/CMakeLists.txt') != ''
+        if: runner.os == 'Windows' && hashFiles('test/windows/runtime/CMakeLists.txt') != ''
         run: |
-          cmake -S test/windows_runtime -B build/windows-runtime-test -A x64
+          cmake -S test/windows/runtime -B build/windows-runtime-test -A x64
           cmake --build build/windows-runtime-test --config Release
           ctest --test-dir build/windows-runtime-test -C Release --output-on-failure
       - run: flutter build ${{ matrix.platform }} --release
@@ -65,7 +65,7 @@ jobs:
           else
             export MUSIFY_TEST_LIBMPV="$(pwd)/build/windows/x64/runner/Release/libmpv-2.dll"
           fi
-          flutter test test/desktop_audio_native_test.dart test/desktop_media_handler_native_test.dart
+          flutter test test/desktop/audio_native_test.dart test/desktop/media_handler_native_test.dart
       - name: Check Linux startup
         if: runner.os == 'Linux'
         run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/musify

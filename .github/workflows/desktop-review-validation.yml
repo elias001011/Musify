@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "d241d9e4018eaf05b60a60279b94a4a36c42555d", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "d241d9e4018eaf05b60a60279b94a4a36c42555d", "layer": "combined"}
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "0dc61d5636e74c5fb42e81f822d77a3b2151ea19", "layer": "port"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "0dc61d5636e74c5fb42e81f822d77a3b2151ea19", "layer": "port"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "2e12e3ca4bec8b675c2f6a82304dec70179891f4", "layer": "combined"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "2e12e3ca4bec8b675c2f6a82304dec70179891f4", "layer": "combined"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "23ca6939e18390c1205d4db864be92cedbfe0159", "layer": "port"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "23ca6939e18390c1205d4db864be92cedbfe0159", "layer": "port"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5

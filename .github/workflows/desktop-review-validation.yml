@@ -15,8 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "3a9d70fe5192e77eca196f84efc41bfd48dbc8b2", "layer": "combined"}
-          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "3a9d70fe5192e77eca196f84efc41bfd48dbc8b2", "layer": "combined"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify", "source": "d241d9e4018eaf05b60a60279b94a4a36c42555d", "layer": "combined"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify", "source": "d241d9e4018eaf05b60a60279b94a4a36c42555d", "layer": "combined"}
+          - {"os": "ubuntu-latest", "platform": "linux", "repository": "elias001011/Musify-Desktop-Port", "source": "0dc61d5636e74c5fb42e81f822d77a3b2151ea19", "layer": "port"}
+          - {"os": "windows-latest", "platform": "windows", "repository": "elias001011/Musify-Desktop-Port", "source": "0dc61d5636e74c5fb42e81f822d77a3b2151ea19", "layer": "port"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -63,7 +65,7 @@ jobs:
           else
             export MUSIFY_TEST_LIBMPV="$(pwd)/build/windows/x64/runner/Release/libmpv-2.dll"
           fi
-          flutter test test/desktop_audio_native_test.dart
+          flutter test test/desktop_audio_native_test.dart test/desktop_media_handler_native_test.dart
       - name: Check Linux startup
         if: runner.os == 'Linux'
         run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/musify
